@@ -3,63 +3,58 @@ use async_std::{fs::File, io, prelude::*, task};
 use futures::executor::block_on;
 use std::thread;
 use futures::join;
-
+use sha1::{Sha1, Digest};
+//use hex_literal::hex;
 
 pub struct Node {
-	pub ip_list: Vec<String>,
-	pub node_port: String, 
 	pub node_IP: String,
+	pub node_port: String, 
+	pub ID : Vec<u8>,
+	pub ip_list: Vec<String>,
 }
 
 impl Node {
+
+	pub fn new(node_IP : String, node_port: String) -> Node {
+		let mut ret_node = Node{
+			node_IP: String::from(node_IP),
+			node_port: String::from(node_port),
+			ID : Vec::new(),
+			ip_list: Vec::new(),
+		};
+		
+		let IP = ret_node.node_IP.clone() + ret_node.node_port.as_str();
+		ret_node.ID = ret_node.assign_ID(IP);
+		println!("Assigning test ID to be");
+		println!("{:?}", ret_node.ID);
+		println!("{:?}", String::from_utf8_lossy(&ret_node.ID));
+		//String::from_utf8_lossy(&buf)
+		return ret_node;
+	}
+
 	pub fn start_first_node(&self) -> std::io::Result<()> {
 		{
-			//self.command_selection();
-			//block_on(self.run_node_server());
-			//self.run_node_server();
-			
-			
-			println!("Running inter task");
-			
-			task::spawn(async { println!("Does it work here?"); });
-			//let node_server = self.run_node_server();
-		
-			let f1 = Node::run_node_server();
-			
-			let test = Node::a_test_function();
-			
-			task::spawn(async{
-				
-				println!("right before a test function lol");
-				//Node::a_test_function().await;
-				f1.await;
-			});
-		
-			//task::spawn(async { f1 });
 
-			//task::block_on(self.inter_async());
+			println!("Starting first known node in a network");
 			
+			let run_server = Node::run_node_server();
+			task::spawn(async{
+				//here we spawn a listener for incoming requests
+				//this will respond to requests
+				run_server.await;
+			});
+			//here we accept user input for different commands
 			task::block_on(self.command_selection());
 			
-
 		} // the socket is closed here
 			Ok(())
 	}
 	
-	async fn a_test_function(){
-		println!("Here I am running a test!!!!!");
-	}
-	
-	async fn inter_async(&self){
-		task::spawn(async { println!("wait a second this works!"); });
-		
-		block_on(self.command_selection());
-	}
 	
 	pub fn start_sub_node(&self, known_ip: String, known_port: String)  -> std::io::Result<()> {
 		{
-			println!("connecting with known node!");
-			block_on(self.connect_with_node(known_ip, known_port));
+			println!("Connecting with known node!");
+			block_on(self.connect_with_node(known_ip, known_port, String::from("FIRST_JOIN")));
 			println!("starting own server");
 			//block_on(self.run_node_server());
 			println!("end!")
@@ -67,7 +62,7 @@ impl Node {
 			Ok(())
 	}
 	
-	async fn connect_with_node(&self, known_ip: String, known_port: String) -> std::io::Result<()> {
+	async fn connect_with_node(&self, known_ip: String, known_port: String, select_command: String) -> std::io::Result<()> {
 		
 		//const THE_MERCHANT_OF_VENICE: &[u8] = b"
 		//    If you prick us, do we not bleed?
@@ -78,7 +73,7 @@ impl Node {
 		
 		const THE_MERCHANT_OF_VENICE: &[u8] = br#"{"command":"FIND_COMP"}"#;
 		
-		//const command = craft_command();
+		//let command = self.craft_command();
 
 		let socket = UdpSocket::bind("127.0.0.1:0").await?;
 
@@ -94,22 +89,22 @@ impl Node {
 		loop{
 			line = String::new();
 			stdin.read_line(&mut line).await?;
-			println!("{}", line);
+			println!("Please select the following commands:\n1-PING Computer\n2- GET value\n3 - STORE value");
+			println!("Selected {}", line);
+			if line == "1"{
+				//self.send_ping_command();
+			} else if line == "2"{
+				//STORE();
+			} else if line == "3" {
+				//GET():
+			} else {
+				println!("Invalid Selection");
+			}
 		}
 		Ok(())
 	}
 	
-	/*fn craft_command(&self, command : String, payload: String) -> json::object! {
-		let command = json::object!{
-		    "command": "",
-		    "payload": {}
-		};
-		
-		command["command"] = command;
-		command["payload"] = json::JsonValue::String(payload);
-		
-		return command;
-	}*/
+
 	
 	async fn run_node_server() -> std::io::Result<()> {
 		let socket = UdpSocket::bind("127.0.0.1:34254").await?;
@@ -134,8 +129,9 @@ impl Node {
 				println!("We have received FIND_VALUE command");
 			} else if parsed_command["command"] == "STORE" {
 				println!("We have received STORE command");
-			} else if parsed_command["command"] == "STORE"{
-				println!("We have received the PING command");	
+			} else if parsed_command["command"] == "PING"{
+				println!("We have received the PING command");
+				//self.receive_ping(parsed_command["payload"]["IP"]);
 			} else {
 				println!("Command not recognized!");
 			}
@@ -144,8 +140,14 @@ impl Node {
 		}
 	}
 	
-	async fn communicate_with_client(socket: UdpSocket){
+	fn receive_ping(IP : String){
+		println!("asdf");
+		//send PING_RECEIVED to other message
 		
+	}
+	
+	async fn communicate_with_client(socket: UdpSocket){
+		println!("dsaf");
 		
 	    //receive_msg(socket);
 	    //send_IPs(socket);
@@ -154,6 +156,20 @@ impl Node {
 	
 	async fn send_IPs(socket: UdpSocket){
 
+	}
+	
+	fn assign_ID(&self, inputID: String) ->  Vec<u8> {
+		//as per kademlia paper, uses sha-1
+		//for now, we are usign the hash of the IP as the ID
+		//using sha-1 per suggestion
+		let mut hasher = Sha1::new();
+		// process input message
+		hasher.update(inputID);
+
+		// acquire hash digest in the form of GenericArray,
+		// which in this case is equivalent to [u8; 20]
+		let result = hasher.finalize();
+		return result.to_vec();
 	}
 	
 
@@ -172,15 +188,7 @@ impl Node {
 		else {
 			println!("Command not recognized!");
 		}
-		
-	    //let mut buf = [0; 10];
-	    //let (number_of_bytes, src_addr) = socket.recv_from(&mut buf)
-		//.expect("Didn't receive data");
-	    //let filled_buf = &mut buf[..number_of_bytes];
+
 	    	Ok(())
 	}
-	//here are the needed functions for Kademlia
-	
-	
-	
 }
