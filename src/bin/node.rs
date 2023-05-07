@@ -84,3 +84,5 @@ impl Node {
 	    	Ok(())
 	}
 }
+fn main() {
+ }

@@ -1,0 +1,9 @@
+/Users/felipetorquato/Desktop/RUST Codes/CC4030/target/debug/deps/libfutures_macro-f71274b0ee9e3046.dylib: /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/lib.rs /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/executor.rs /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/join.rs /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/select.rs /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/stream_select.rs
+
+/Users/felipetorquato/Desktop/RUST Codes/CC4030/target/debug/deps/futures_macro-f71274b0ee9e3046.d: /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/lib.rs /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/executor.rs /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/join.rs /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/select.rs /Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/stream_select.rs
+
+/Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/lib.rs:
+/Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/executor.rs:
+/Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/join.rs:
+/Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/select.rs:
+/Users/felipetorquato/.cargo/registry/src/github.com-1ecc6299db9ec823/futures-macro-0.3.26/src/stream_select.rs:
