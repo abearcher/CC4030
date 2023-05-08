@@ -97,11 +97,19 @@ impl NodeServer {
 			} else {
 				println!("Command not recognized!");
 			}
+			
+			self.write_to_file(received_string.to_string());
 				
 				//println!("stuff inside code");
 		}
 	}
 	
+	
+	fn write_to_file(&self, output : String){
+	
+		let mut data_file = File::create("data.txt").expect("creation failed");
+		data_file.write(output.as_bytes()).expect("write failed");
+	}
 	
 	async fn communicate_with_client(socket: UdpSocket){
 		println!("dsaf");

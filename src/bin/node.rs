@@ -56,12 +56,12 @@ impl Node {
 			let server_obj = node_server::NodeServer::new(self.node_IP.clone(), self.node_port.clone());
 			//let run_server = server_obj.run_node_server();
 			
-			task::block_on(server_obj.run_node_server());
+			//task::block_on(server_obj.run_node_server());
 			
 			task::spawn(async move{
 				//here we spawn a listener for incoming requests
 				//this will respond to requests
-				server_obj.run_node_server();
+				server_obj.run_node_server().await;
 			});
 			
 			let client_obj = node_client::NodeClient::new(self.node_IP.clone(), self.node_port.clone());
