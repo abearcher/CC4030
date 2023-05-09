@@ -23,12 +23,17 @@ pub async fn send_command_to_node(known_ip: String, known_port: String, crafted_
 	//    And if you wrong us, shall we not revenge?
 	//";
 	
+	let addr = format!("{}:{}", known_ip, known_port);
+	
+	println!("----------------------fart");
+	println!("Sending to --{}--", addr);
+	
 	let THE_MERCHANT_OF_VENICE: Vec<u8> = crafted_cmd.to_string().into_bytes();
 	//br#"{"command":"FIND_COMP"}"#;
 
 	let socket = UdpSocket::bind("127.0.0.1:0").await?;
 
-	let addr = "127.0.0.1:34254";
+	//let addr = "127.0.0.1:34254";
 	let sent = socket.send_to(&THE_MERCHANT_OF_VENICE, &addr).await?;
 	println!("Sent {} bytes to {}", sent, addr);
 	Ok(())

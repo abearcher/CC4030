@@ -1,4 +1,5 @@
 use async_std::net::UdpSocket;
+use async_std::task;
 use sha1::{Sha1, Digest};
 use std::fs::File;
 use std::io::Write;
@@ -34,16 +35,18 @@ impl NodeServer {
 
 
 	/* ----- FUNCTIONS FOR SERVER ------- */
-	fn rcv_ping(&self, rcv_ip : String, rcv_port : String){
+	async fn rcv_ping(&self, rcv_ip : String, rcv_port : String){
+		println!("Sending ping response back!");
 		let ping_rcv_payload = json::object!(
-			"sender_ip": self.node_IP.clone(),
-			"sender_ip": self.node_port.clone()
+			"IP": self.node_IP.clone(),
+			"PORT": self.node_port.clone()
 		);
 		
 		let ping_reply = node_commands::craft_command("PING_RECV".to_string(), ping_rcv_payload);
 		
 		//send ID
-		node_commands::send_command_to_node(rcv_ip, rcv_port, ping_reply);
+		task::block_on(node_commands::send_command_to_node(rcv_ip, rcv_port, ping_reply));
+
 		
 	}
 	
@@ -67,8 +70,14 @@ impl NodeServer {
 
 	
 	pub async fn run_node_server(&self) -> std::io::Result<()> {
-		let socket = UdpSocket::bind("127.0.0.1:34254").await?;
-		println!("Starting server");
+	
+		//let bind_to = self.node_IP.clone() + ":" + self.node_port.as_str();
+		
+		let bind_to = format!("{}:{}", self.node_IP, self.node_port);
+		//let socket = UdpSocket::bind("127.0.0.1:34254").await?;
+		println!("Starting server at {}", bind_to.to_string());
+		let socket = UdpSocket::bind(bind_to).await?;
+
 		
 		let mut buf = vec![0u8; 1024];
 		
@@ -91,7 +100,9 @@ impl NodeServer {
 				println!("We have received STORE command");
 			} else if parsed_command["command"] == "PING"{
 				println!("We have received the PING command");
-				self.rcv_ping(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string());
+				
+				task::block_on(self.rcv_ping(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string()));
+
 			} else if parsed_command["command"] == "FIRST_JOIN"{
 				println!("We have received the FIRST_JOIN command");
 			} else {

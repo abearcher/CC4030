@@ -94,6 +94,21 @@ impl Node {
 			
 			//self.send_ping_cmd(known_ip, known_port);
 			
+			//start server here
+			let server_obj = node_server::NodeServer::new(self.node_IP.clone(), self.node_port.clone());
+			
+			task::spawn(async move{
+				//here we spawn a listener for incoming requests
+				//this will respond to requests
+				server_obj.run_node_server().await;
+			});
+			
+			let client_obj = node_client::NodeClient::new(self.node_IP.clone(), self.node_port.clone());
+			
+			println!("cloned object: {}", self.node_IP.clone());
+			
+			//here we accept user input for different commands
+			task::block_on(client_obj.command_selection());
 			
 			println!("end!")
 		}
