@@ -39,7 +39,7 @@ impl NodeClient {
 				let port = line.trim().to_string();
 				
 				println!("t1, ip: {}, port {}", ip, port);
-				task::block_on(self.full_ping_cmd(ip, port));
+				task::block_on(self.full_ping_cmd(ip, port, self.node_IP.clone(), "4949".to_string()));
 				println!("t2");
 				
 			} else if line == "2"{
@@ -53,7 +53,26 @@ impl NodeClient {
 		Ok(())
 	}
 	
-	async fn full_ping_cmd(&self, receiver_ip : String, receiver_port : String){
+	
+	async fn full_ping_cmd(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String){
+	
+		let ip_of_sender_clone  = ip_of_sender.clone();
+		let tmp_port_of_sender_clone = tmp_port_of_sender.clone();
+		
+		let ping_payload = json::object!(
+			"IP": ip_of_sender,
+			"PORT": tmp_port_of_sender
+		);
+		
+		let ping_command = node_commands::craft_command("PING".to_string(), ping_payload);
+	
+		task::block_on(node_commands::send_and_rcv_command(send_to_ip, send_to_port, ping_command, ip_of_sender_clone, tmp_port_of_sender_clone));
+	
+	
+	
+	}
+	
+	/*async fn full_ping_cmd(&self, receiver_ip : String, receiver_port : String){
 		println!("t3");
 	
 		println!("sending to {}:{}", receiver_ip, receiver_port);
@@ -87,7 +106,7 @@ impl NodeClient {
 		
    		//task::block_on(handle);
 	
-	}
+	}*/
 
 
 	async fn send_ping_cmd(&self, node_IP : String, node_port : String, receiver_ip : String, receiver_port : String){
@@ -104,7 +123,7 @@ impl NodeClient {
 		println!("sent!")
 	}
 	
-	pub async fn tmp_srv(node_IP : String, node_port : String,  ready_flag: Arc<Mutex<bool>>) -> std::io::Result<()> {
+	/*pub async fn tmp_srv(node_IP : String, node_port : String,  ready_flag: Arc<Mutex<bool>>) -> std::io::Result<()> {
 	
 		let bind_to = format!("{}:{}", node_IP, node_port);
 		//let socket = UdpSocket::bind("127.0.0.1:34254").await?;
@@ -137,7 +156,7 @@ impl NodeClient {
 				println!("Command not recognized!");
 			}
 		}
-	}
+	}*/
 	
 }
 	
