@@ -5,11 +5,13 @@ use std::thread;
 use futures::join;
 use json::JsonValue;
 use sha1::{Sha1, Digest};
+use std::sync::{Mutex, Arc};
 
 
 mod node_server;
 mod node_commands;
 mod node_client;
+mod node_object;
 //mod cm;
 use node_server::NodeServer; // Use the NodeCommand struct
 //use cmd;
@@ -17,30 +19,36 @@ use node_server::NodeServer; // Use the NodeCommand struct
 
 //use hex_literal::hex;
 
-pub struct Node {
-	pub node_IP: String,
-	pub node_port: String, 
-	//pub ID : Vec<u8>,
-	//pub ip_list: Vec<String>,
+pub struct NodeRunner {
+	node: Arc<Mutex<node_object::Node>>
+	//pub node: node_object::Node
 }
 
-impl Node {
+impl NodeRunner {
 
-	pub fn new(node_IP : String, node_port: String) -> Node {
-		let mut ret_node = Node{
+	pub fn new(node_IP : String, node_port: String, k : i32) -> NodeRunner {
+		/*let mut ret_node = Node{
 			node_IP: String::from(node_IP),
 			node_port: String::from(node_port),
 			//ID : Vec::new(),
 			//ip_list: Vec::new(),
-		};
+		};*/
 		
-		let IP = ret_node.node_IP.clone() + ret_node.node_port.as_str();
+		//let IP = ret_node.node_IP.clone() + ret_node.node_port.as_str();
 		//ret_node.ID = ret_node.assign_ID(IP);
 		//println!("Assigning test ID to be");
 		//println!("{:?}", ret_node.ID);
 		//println!("{:?}", String::from_utf8_lossy(&ret_node.ID));
 		//String::from_utf8_lossy(&buf)
-		return ret_node;
+
+ 		let node = Arc::new(Mutex::new(node_object::Node::new(node_IP, node_port, k)));
+		NodeRunner {
+			node: node,
+		}
+
+		//NodeRunner{
+			//node: node_object::Node::new(node_IP, node_port)
+		//}
 	}
 
 	pub fn start_first_node(&self) -> std::io::Result<()> {
@@ -48,12 +56,18 @@ impl Node {
 
 			println!("Starting first known node in a network");
 			
+			//let node = node_object::Node::new(node_IP, node_port)
+			
+			let node_clone = self.node.clone();
+			let server_node = node_clone.clone();
+			let client_node = node_clone.clone();
+			
 			//let server_node = NodeServer::NodeServer::new(self.node_IP.clone(), self.node_port.clone());
 			//let handle = async_std::task::spawn(async move {
 			//	self.run_node_server().await
 			//});
 			
-			let server_obj = node_server::NodeServer::new(self.node_IP.clone(), self.node_port.clone());
+			//let server_obj = node_server::NodeServer::new(self.node);
 			//let run_server = server_obj.run_node_server();
 			
 			//task::block_on(server_obj.run_node_server());
@@ -61,10 +75,11 @@ impl Node {
 			task::spawn(async move{
 				//here we spawn a listener for incoming requests
 				//this will respond to requests
+				let mut server_obj = node_server::NodeServer::new(server_node);
 				server_obj.run_node_server().await;
 			});
 			
-			let client_obj = node_client::NodeClient::new(self.node_IP.clone(), self.node_port.clone());
+			let client_obj = node_client::NodeClient::new(client_node);
 			
 			//here we accept user input for different commands
 			task::block_on(client_obj.command_selection());
@@ -78,10 +93,20 @@ impl Node {
 		{
 			println!("Connecting with known node!");
 			
+			let node_clone = self.node.clone();
+			let server_node = node_clone.clone();
+			let client_node = node_clone.clone();
+			
+			let this_node = self.node.lock().unwrap();
+			
 			let first_join_payload = json::object!(
-				"sender_ip": self.node_IP.clone(),
-				"sender_ip": self.node_port.clone()
+				"sender_ip": this_node.node_IP.clone(),
+				"sender_ip": this_node.node_port.clone()
 			);
+			
+			drop(this_node);
+			
+			let node_clone = self.node.clone();
 			
 			//String::from("FIRST_JOIN")
 			let first_join_cmd = node_commands::craft_command("FIRST_JOIN".to_string(), first_join_payload);
@@ -95,17 +120,16 @@ impl Node {
 			//self.send_ping_cmd(known_ip, known_port);
 			
 			//start server here
-			let server_obj = node_server::NodeServer::new(self.node_IP.clone(), self.node_port.clone());
+			//let server_obj = node_server::NodeServer::new(&self.node);
 			
 			task::spawn(async move{
 				//here we spawn a listener for incoming requests
 				//this will respond to requests
+				let mut server_obj = node_server::NodeServer::new(server_node);
 				server_obj.run_node_server().await;
 			});
 			
-			let client_obj = node_client::NodeClient::new(self.node_IP.clone(), self.node_port.clone());
-			
-			println!("cloned object: {}", self.node_IP.clone());
+			let client_obj = node_client::NodeClient::new(client_node);
 			
 			//here we accept user input for different commands
 			task::block_on(client_obj.command_selection());

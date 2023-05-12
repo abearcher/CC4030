@@ -3,21 +3,39 @@ use async_std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 
 use crate::node::node_commands;
+use crate::node::node_object;
+
 
 pub struct NodeClient {
 	pub node_IP: String,
 	pub node_port: String, 
+	pub node : Arc<Mutex<node_object::Node>>
 }
 
 impl NodeClient {
 	
-	pub fn new(node_IP : String, node_port: String) -> NodeClient {
+	/*pub fn new(node_IP : String, node_port: String) -> NodeClient {
 		let mut ret_node = NodeClient{
 			node_IP: String::from(node_IP),
 			node_port: String::from(node_port),
 		};
 
 		return ret_node;
+	}*/
+	
+	
+	pub fn new(node_in : Arc<Mutex<node_object::Node>>) -> NodeClient{
+		let this_node = node_in.lock().unwrap();
+
+		let ip_in = this_node.node_IP.clone();
+		let port_in = this_node.node_port.clone();
+		drop(this_node);
+	
+		NodeClient{
+			node_IP : ip_in,
+			node_port : port_in,
+			node : node_in,
+		}	
 	}
 
 	pub async fn command_selection(&self)-> io::Result<()> {
@@ -66,7 +84,9 @@ impl NodeClient {
 		
 		let ping_command = node_commands::craft_command("PING".to_string(), ping_payload);
 	
-		task::block_on(node_commands::send_and_rcv_command(send_to_ip, send_to_port, ping_command, ip_of_sender_clone, tmp_port_of_sender_clone));
+		let test = task::block_on(node_commands::send_and_rcv_command(send_to_ip, send_to_port, ping_command, ip_of_sender_clone, tmp_port_of_sender_clone));
+		
+		println!("What we got {}", test);
 	
 	
 	

@@ -3,19 +3,24 @@ use async_std::task;
 use sha1::{Sha1, Digest};
 use std::fs::File;
 use std::io::Write;
+use std::sync::{Mutex, Arc};
+use std::any::Any;
+//use bytes::{BigEndian, ByteOrder};
 
 use crate::node::node_commands;
+use crate::node::node_object;
 
-pub struct NodeServer {
+pub struct NodeServer  {
 	pub node_IP: String,
 	pub node_port: String, 
-	pub ID : Vec<u8>,
-	pub ip_list: Vec<String>,
+	//pub ID : Vec<u8>,
+	//pub ip_list: Vec<String>,
+	pub node : Arc<Mutex<node_object::Node>>
 }
 
-impl NodeServer {
+impl  NodeServer  {
 
-	pub fn new(node_IP : String, node_port: String) -> NodeServer {
+	/*pub fn new(node_IP : String, node_port: String) -> NodeServer {
 		let mut ret_node = NodeServer{
 			node_IP: String::from(node_IP),
 			node_port: String::from(node_port),
@@ -30,8 +35,23 @@ impl NodeServer {
 		println!("{:?}", String::from_utf8_lossy(&ret_node.ID));
 		//String::from_utf8_lossy(&buf)
 		return ret_node;
-	}
+	}*/
 
+	pub fn new(node_in : Arc<Mutex<node_object::Node>>) -> NodeServer {
+		//let node = node_in.lock().unwrap();
+
+		let this_node = node_in.lock().unwrap();
+
+		let ip_in = this_node.node_IP.clone();
+		let port_in = this_node.node_port.clone();
+		drop(this_node);
+	
+		NodeServer{
+			node_IP : ip_in,
+			node_port : port_in,
+			node : node_in
+		}	
+	}
 
 
 	/* ----- FUNCTIONS FOR SERVER ------- */
@@ -49,26 +69,8 @@ impl NodeServer {
 
 		
 	}
-	
-	
-	fn assign_ID(&self, inputID: String) ->  Vec<u8> {
-		//as per kademlia paper, uses sha-1
-		//for now, we are usign the hash of the IP as the ID
-		//using sha-1 per suggestion
-		let mut hasher = Sha1::new();
-		// process input message
-		hasher.update(inputID);
-
-		// acquire hash digest in the form of GenericArray,
-		// which in this case is equivalent to [u8; 20]
-		let result = hasher.finalize();
-		return result.to_vec();
-	}
-	
 
 
-
-	
 	pub async fn run_node_server(&self) -> std::io::Result<()> {
 	
 		//let bind_to = self.node_IP.clone() + ":" + self.node_port.as_str();
@@ -94,10 +96,15 @@ impl NodeServer {
 			
 			if parsed_command["command"] == "FIND_COMP" {
 				println!("We have received FIND_COMP command");
+				let id = parsed_command["payload"]["ID"].to_string().as_bytes().to_vec();
+				self.FIND_COMP(id);
 			} else if parsed_command["command"] == "FIND_VALUE" {
 				println!("We have received FIND_VALUE command");
 			} else if parsed_command["command"] == "STORE" {
 				println!("We have received STORE command");
+				let key = parsed_command["payload"]["KEY"].to_string();
+				let value = parsed_command["payload"]["VALUE"].to_string();
+				self.STORE(key, value);
 			} else if parsed_command["command"] == "PING"{
 				println!("We have received the PING command");
 				
@@ -109,11 +116,155 @@ impl NodeServer {
 				println!("Command not recognized!");
 			}
 			
-			self.write_to_file(received_string.to_string());
+			//self.write_to_file(received_string.to_string());
 				
 				//println!("stuff inside code");
 		}
 	}
+	
+	fn FIND_COMP(&self, id : Vec<u8>) -> Vec<node_object::RoutingTablePair> {
+	
+		let mut min = node_object::RoutingTablePair::new("".to_string(),Vec::new());
+		let mut min_index = 0;
+	
+		//let list_of_closest_comps = Vec::new();
+		let mut list_of_closest_comps: Vec<node_object::RoutingTablePair> = Vec::new();
+	
+		//let this_node = node_in.lock().unwrap();
+		let this_node = self.node.lock().unwrap();
+		let k = this_node.k.clone();
+		let mut list = this_node.routing_table.clone();
+		drop(this_node);
+		
+		for i in 0..k-1{
+			(min, min_index) = self.find_min_dist(id.clone(), list.clone());
+			list_of_closest_comps.push(min);
+			list.remove(min_index.try_into().unwrap());
+		}
+		
+		return list_of_closest_comps;
+	}
+
+
+	fn find_min_dist(&self, id : Vec<u8>, list: Vec<node_object::RoutingTablePair>) -> (node_object::RoutingTablePair, i32){
+		//let this_node = self.node.lock().unwrap();
+		//let len_of_id_list = this_node.ip_list.clone().len();
+		//let list = this_node.ip_list.clone();
+		//drop(this_node);
+		let len_of_id_list = list.len();
+		let mut counting_dist = self.ret_max_value();
+		//std::i32::MAX;
+		let mut cur_id = id.clone();
+		let mut counting_dist_index = 0;
+		let mut ret_rout_table_pair = node_object::RoutingTablePair::new("".to_string(), Vec::new());
+		
+		for i in 0..len_of_id_list{
+			//dist = cur_id ^ list[i].id;
+			let mut dist = Vec::new();
+			
+			for (a, b) in cur_id.iter().zip(list[i].id.clone()) {
+			    dist.push(a ^ b);
+			}
+			
+			let dist_val = u128::from_be_bytes(dist[..].try_into().unwrap());
+			
+			if  self.is_vec1_smaller_than_vec2(dist.clone(), counting_dist.clone()){
+			//dist < counting_dist
+				counting_dist = dist.clone();
+				cur_id = list[i].clone().id;
+				counting_dist_index = i;
+				
+				ret_rout_table_pair.id = list[i].id.clone();
+				ret_rout_table_pair.ip = list[i].ip.clone();
+			}
+		}
+		
+		return (ret_rout_table_pair, counting_dist_index.try_into().unwrap());	
+	}
+	
+	fn is_vec1_smaller_than_vec2(&self, vec1 : Vec<u8>, vec2: Vec<u8>) -> bool {
+		let mut i = 0;
+		while i < vec1.len() && i < vec2.len() {
+		    if vec1[i] < vec2[i] {
+			return true;
+		    } else if vec1[i] > vec2[i] {
+			return false;
+		    }
+		    i += 1;
+		}
+		return false;
+	}
+	
+	fn ret_max_value(&self) -> Vec<u8>{
+		let mut v = Vec::new();
+		let mut max_byte: u8 = 0xFF; // initialize to maximum possible value
+		for i in 0..20{
+			v.push(max_byte);
+		}
+		return v;
+	}
+	
+	fn STORE(&self, key : String, value : String){
+		let mut this_node = self.node.lock().unwrap();
+    		this_node.storage.insert(key, value);
+	}
+	
+	/*fn format_find_cmp_as_str(list : Vec<node_object::RoutingTablePair>) -> String{
+		//Vec<node_object::RoutingTablePair>
+		
+		let mut ret_str = "".to_string();
+		
+		for i in 0..list.len(){
+			if i > 0 {
+				ret_str = ret_str + ",".to_string();
+			}
+		
+			let tmp_str = format!("({},{})", list[i].ip, list[i].id).to_string();
+			ret_str = ret_str + tmp_str;
+			//format!("{}{}", ret_str.clone(), tmp_str.clone());
+		}
+		
+		//ret_str = ret_str + "";
+		
+		return ret_str;
+	
+	}*/
+	
+	fn format_find_cmp_as_str(&self, list: Vec<node_object::RoutingTablePair>) -> String {
+		let mut ret_str = String::new();
+
+		for (i, pair) in list.iter().enumerate() {
+			if i > 0 {
+			    ret_str.push(',');
+			}
+
+			let id_str = String::from_utf8_lossy(&pair.id).to_string();
+			let pair_str = format!("({}, {})", pair.ip, id_str);
+			ret_str.push_str(&pair_str);
+		}
+
+		ret_str
+	}
+
+	
+	fn FIND_VALUE(&self, key : String) -> String {
+	
+		let this_node = self.node.lock().unwrap();
+		let storage_map = this_node.storage.clone();
+		let list = this_node.routing_table.clone();
+		drop(this_node);
+		
+		let ret_value = storage_map.get(&key);
+	
+		if let Some(value) = ret_value {
+			 return value.to_owned();
+		} else {
+			let ret_comp = self.FIND_COMP(key.as_bytes().to_vec());
+			return self.format_find_cmp_as_str(ret_comp);
+		}
+		
+	}
+
 	
 	
 	fn write_to_file(&self, output : String){
