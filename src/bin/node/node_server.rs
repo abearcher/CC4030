@@ -69,6 +69,36 @@ impl  NodeServer  {
 
 		
 	}
+	
+	
+	async fn rcv_find_value(&self, rcv_ip : String, rcv_port : String, value_or_list : String, ret_value : String){
+		println!("Sending ping response back!");
+		let find_value_payload = json::object!(
+			"value_or_list": value_or_list,
+			"value": ret_value
+		);
+		
+		let reply = node_commands::craft_command("FIND_VALUE_RECV".to_string(), find_value_payload);
+		
+		//send ID
+		task::block_on(node_commands::send_command_to_node(rcv_ip, rcv_port, reply));
+		
+	}
+	
+	async fn rcv_find_comp(&self, rcv_ip : String, rcv_port : String, comp_str : String){
+	
+		println!("Sending ping response back!");
+		let find_value_payload = json::object!(
+			"comp_list": comp_str
+		);
+		
+		let reply = node_commands::craft_command("FIND_COMP_RCV".to_string(), find_value_payload);
+		
+		//send ID
+		task::block_on(node_commands::send_command_to_node(rcv_ip, rcv_port, reply));
+	
+	
+	}
 
 
 	pub async fn run_node_server(&self) -> std::io::Result<()> {
@@ -97,14 +127,26 @@ impl  NodeServer  {
 			if parsed_command["command"] == "FIND_COMP" {
 				println!("We have received FIND_COMP command");
 				let id = parsed_command["payload"]["ID"].to_string().as_bytes().to_vec();
-				self.FIND_COMP(id);
+				let ret_find_comp = self.FIND_COMP(id);
+				task::block_on(self.rcv_find_comp(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string(), ret_find_comp));
 			} else if parsed_command["command"] == "FIND_VALUE" {
 				println!("We have received FIND_VALUE command");
+				let key = parsed_command["payload"]["key"].to_string();
+				let (ret_val, value_or_list )= self.FIND_VALUE(key);
+				task::block_on(self.rcv_find_value(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string(), ret_val, value_or_list));
 			} else if parsed_command["command"] == "STORE" {
 				println!("We have received STORE command");
-				let key = parsed_command["payload"]["KEY"].to_string();
-				let value = parsed_command["payload"]["VALUE"].to_string();
+				let key = parsed_command["payload"]["key"].to_string();
+				let value = parsed_command["payload"]["value"].to_string();
 				self.STORE(key, value);
+				
+				let this_node = self.node.lock().unwrap();
+    				//this_node.storage.insert(key, value);
+				for (key, value) in &this_node.storage {
+					println!("{}: {}", key, value);
+				}
+				drop(this_node);
+				
 			} else if parsed_command["command"] == "PING"{
 				println!("We have received the PING command");
 				
@@ -247,7 +289,7 @@ impl  NodeServer  {
 	}
 
 	
-	fn FIND_VALUE(&self, key : String) -> String {
+	fn FIND_VALUE(&self, key : String) -> (String, String) {
 	
 		let this_node = self.node.lock().unwrap();
 		let storage_map = this_node.storage.clone();
@@ -257,10 +299,10 @@ impl  NodeServer  {
 		let ret_value = storage_map.get(&key);
 	
 		if let Some(value) = ret_value {
-			 return value.to_owned();
+			 return (value.to_owned(), "value".to_string());
 		} else {
 			let ret_comp = self.FIND_COMP(key.as_bytes().to_vec());
-			return self.format_find_cmp_as_str(ret_comp);
+			return (self.format_find_cmp_as_str(ret_comp), "value".to_string());
 		}
 		
 	}

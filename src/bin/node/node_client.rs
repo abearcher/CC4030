@@ -1,6 +1,7 @@
 use async_std::{fs::File, io, prelude::*, task};
 use async_std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
+use hex;
 
 use crate::node::node_commands;
 use crate::node::node_object;
@@ -9,6 +10,7 @@ use crate::node::node_object;
 pub struct NodeClient {
 	pub node_IP: String,
 	pub node_port: String, 
+	pub id : Vec<u8>,
 	pub node : Arc<Mutex<node_object::Node>>
 }
 
@@ -29,22 +31,28 @@ impl NodeClient {
 
 		let ip_in = this_node.node_IP.clone();
 		let port_in = this_node.node_port.clone();
+		let id_in = this_node.ID.clone();
 		drop(this_node);
 	
 		NodeClient{
 			node_IP : ip_in,
 			node_port : port_in,
+			id : id_in,
 			node : node_in,
 		}	
 	}
 
 	pub async fn command_selection(&self)-> io::Result<()> {
 		let stdin = io::stdin();
+		
+		
 		let mut line = String::new();
 		loop{
+			let ip_of_sender = self.node_IP.clone();
+			let port_of_sender = "4949".to_string();
 			line = String::new();
 			stdin.read_line(&mut line).await?;
-			println!("Please select the following commands:\n1-PING Computer\n2- GET value\n3 - STORE value");
+			println!("Please select the following commands:\n1-PING Computer\n2 - STORE value\n3 - FIND VALUE\n4 - FIND COMPUTER/NODE");
 			println!("Selected {}", line);
 			if line.trim().to_string() == "1"{
 				println!("You have chosen to PING. Please select IP");
@@ -57,13 +65,65 @@ impl NodeClient {
 				let port = line.trim().to_string();
 				
 				println!("t1, ip: {}, port {}", ip, port);
-				task::block_on(self.full_ping_cmd(ip, port, self.node_IP.clone(), "4949".to_string()));
-				println!("t2");
+				task::block_on(self.full_ping_cmd(ip, port, ip_of_sender, port_of_sender));
+
 				
-			} else if line == "2"{
-				//STORE();
-			} else if line == "3" {
-				//GET():
+			} else if line.trim().to_string() == "2"{
+				//STORE(key, value);
+				println!("You have chosen to STORE. Please select IP");
+				line = String::new();
+				stdin.read_line(&mut line).await?;
+				let ip = line.trim().to_string();
+				line = String::new();
+				println!("Please enter port");
+				stdin.read_line(&mut line).await?;
+				let port = line.trim().to_string();
+				line = String::new();
+				println!("Please enter key to store");
+				stdin.read_line(&mut line).await?;
+				let key = line.trim().to_string();
+				line = String::new();
+				println!("Please enter value to store");
+				stdin.read_line(&mut line).await?;
+				let value = line.trim().to_string();
+				
+				println!("t1, ip: {}, port {}", ip, port);
+				task::block_on(self.STORE(ip, port, key, value));
+
+			} else if line.trim().to_string() == "3" {
+				//FIND_VALUE(key):
+								println!("You have chosen to STORE. Please select IP");
+				line = String::new();
+				stdin.read_line(&mut line).await?;
+				let ip = line.trim().to_string();
+				line = String::new();
+				println!("Please enter port");
+				stdin.read_line(&mut line).await?;
+				let port = line.trim().to_string();
+				line = String::new();
+				println!("Please enter key to search for");
+				stdin.read_line(&mut line).await?;
+				let key = line.trim().to_string();
+				
+				println!("t1, ip: {}, port {}", ip, port);
+				task::block_on(self.FIND_VALUE(ip, port, ip_of_sender, port_of_sender, key));
+
+			} else if line.trim().to_string() == "4"{
+				//FIND_COMP(id)
+				line = String::new();
+				stdin.read_line(&mut line).await?;
+				let ip = line.trim().to_string();
+				line = String::new();
+				println!("Please enter port");
+				stdin.read_line(&mut line).await?;
+				let port = line.trim().to_string();
+				//line = String::new();
+				//println!("Please enter value to search for");
+				//stdin.read_line(&mut line).await?;
+				//let value = line.trim().to_string();
+				
+				println!("t1, ip: {}, port {}", ip, port);
+				task::block_on(self.FIND_COMP(ip, port, ip_of_sender, port_of_sender, hex::encode(&self.id)));
 			} else {
 				println!("Invalid Selection");
 			}
@@ -71,8 +131,54 @@ impl NodeClient {
 		Ok(())
 	}
 	
+	async fn FIND_VALUE(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String, key : String) -> json::JsonValue {
+		let ip_of_sender_clone  = ip_of_sender.clone();
+		let tmp_port_of_sender_clone = tmp_port_of_sender.clone();
+		
+		let payload = json::object!(
+			"key": key,
+		);
+		
+		let cmd = node_commands::craft_command("PING".to_string(), payload);
 	
-	async fn full_ping_cmd(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String){
+		let ret_str = task::block_on(node_commands::send_and_rcv_command(send_to_ip, send_to_port, cmd, ip_of_sender_clone, tmp_port_of_sender_clone));
+		
+		println!("What we got {}", ret_str);
+		
+		return ret_str;
+	
+	}
+	
+	async fn FIND_COMP(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String, id : String) -> json::JsonValue {
+		let ip_of_sender_clone  = ip_of_sender.clone();
+		let tmp_port_of_sender_clone = tmp_port_of_sender.clone();
+
+		let payload = json::object!(
+			"id": id,
+		);
+
+		let cmd = node_commands::craft_command("PING".to_string(), payload);
+
+		let ret_str = task::block_on(node_commands::send_and_rcv_command(send_to_ip, send_to_port, cmd, ip_of_sender_clone, tmp_port_of_sender_clone));
+
+		println!("What we got {}", ret_str);
+
+		return ret_str;
+	}
+	
+	async fn STORE(&self, send_to_ip : String, send_to_port : String, key : String, value : String){
+		let store_payload = json::object!(
+			"key" : key,
+			"value" : value,
+		);
+		
+		let store_cmd = node_commands::craft_command("STORE".to_string(), store_payload);
+	
+		task::block_on(node_commands::send_command_to_node(send_to_ip, send_to_port, store_cmd));
+	}
+	
+	
+	async fn full_ping_cmd(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String) -> json::JsonValue{
 	
 		let ip_of_sender_clone  = ip_of_sender.clone();
 		let tmp_port_of_sender_clone = tmp_port_of_sender.clone();
@@ -84,12 +190,11 @@ impl NodeClient {
 		
 		let ping_command = node_commands::craft_command("PING".to_string(), ping_payload);
 	
-		let test = task::block_on(node_commands::send_and_rcv_command(send_to_ip, send_to_port, ping_command, ip_of_sender_clone, tmp_port_of_sender_clone));
+		let ret_str = task::block_on(node_commands::send_and_rcv_command(send_to_ip, send_to_port, ping_command, ip_of_sender_clone, tmp_port_of_sender_clone));
 		
-		println!("What we got {}", test);
-	
-	
-	
+		println!("What we got {}", ret_str);
+		
+		return ret_str;
 	}
 	
 	/*async fn full_ping_cmd(&self, receiver_ip : String, receiver_port : String){
