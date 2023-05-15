@@ -102,6 +102,15 @@ pub async fn tmp_srv(ip_of_sender : String, ip_of_port : String, ready_flag: Arc
 
 	}
 
+pub fn sha1_to_string(hash: &[u8]) -> String {
+	let hex_chars: Vec<String> = hash
+		.iter()
+		.map(|byte| format!("{:02x}", byte))
+		.collect();
+
+	hex_chars.join("")
+}
+
 
 
 

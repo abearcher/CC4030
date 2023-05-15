@@ -5,10 +5,13 @@ use std::fs::File;
 use std::io::Write;
 use std::sync::{Mutex, Arc};
 use std::any::Any;
+use json::{object, JsonValue};
+use std::option::Option;
 //use bytes::{BigEndian, ByteOrder};
 
-use crate::node::node_commands;
+use crate::node::{node_client, node_commands};
 use crate::node::node_object;
+use crate::node::node_object::RoutingTablePair;
 
 pub struct NodeServer  {
 	pub node_IP: String,
@@ -85,8 +88,18 @@ impl  NodeServer  {
 		
 	}
 	
-	async fn rcv_find_comp(&self, rcv_ip : String, rcv_port : String, comp_str : String){
-	
+	async fn rcv_find_comp(&self, rcv_ip : String, rcv_port : String, routing_table_vector : Vec<RoutingTablePair>){
+
+		let mut comp_str = Vec::new();
+		for pair in routing_table_vector {
+			let obj = object! {
+				"ip": pair.ip,
+				"port": pair.port,
+				"id": pair.id};
+
+			comp_str.push(obj);
+		}
+
 		println!("Sending ping response back!");
 		let find_value_payload = json::object!(
 			"comp_list": comp_str
@@ -132,20 +145,20 @@ impl  NodeServer  {
 			} else if parsed_command["command"] == "FIND_VALUE" {
 				println!("We have received FIND_VALUE command");
 				let key = parsed_command["payload"]["key"].to_string();
-				let (ret_val, value_or_list )= self.FIND_VALUE(key);
+				let (ret_val, value_or_list )= self.find_value(key);
 				task::block_on(self.rcv_find_value(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string(), ret_val, value_or_list));
 			} else if parsed_command["command"] == "STORE" {
 				println!("We have received STORE command");
-				let key = parsed_command["payload"]["key"].to_string();
-				let value = parsed_command["payload"]["value"].to_string();
-				self.STORE(key, value);
+				//let key = parsed_command["payload"]["key"].to_string();
+				//let value = parsed_command["payload"]["value"].clone();
+				self.store_command(parsed_command.clone());
 				
-				let this_node = self.node.lock().unwrap();
+				/*let this_node = self.node.lock().unwrap();
     				//this_node.storage.insert(key, value);
 				for (key, value) in &this_node.storage {
 					println!("{}: {}", key, value);
 				}
-				drop(this_node);
+				drop(this_node);*/
 				
 			} else if parsed_command["command"] == "PING"{
 				println!("We have received the PING command");
@@ -166,7 +179,7 @@ impl  NodeServer  {
 	
 	fn FIND_COMP(&self, id : Vec<u8>) -> Vec<node_object::RoutingTablePair> {
 	
-		let mut min = node_object::RoutingTablePair::new("".to_string(),Vec::new());
+		let mut min = node_object::RoutingTablePair::new("".to_string(), "".to_string(),Vec::new());
 		let mut min_index = 0;
 	
 		//let list_of_closest_comps = Vec::new();
@@ -198,7 +211,7 @@ impl  NodeServer  {
 		//std::i32::MAX;
 		let mut cur_id = id.clone();
 		let mut counting_dist_index = 0;
-		let mut ret_rout_table_pair = node_object::RoutingTablePair::new("".to_string(), Vec::new());
+		let mut ret_rout_table_pair = node_object::RoutingTablePair::new("".to_string(), "".to_string(),Vec::new());
 		
 		for i in 0..len_of_id_list{
 			//dist = cur_id ^ list[i].id;
@@ -246,11 +259,114 @@ impl  NodeServer  {
 		return v;
 	}
 	
-	fn STORE(&self, key : String, value : String){
+	/*fn store(&self, key : String, value : String){
 		let mut this_node = self.node.lock().unwrap();
-    		this_node.storage.insert(key, value);
+		this_node.storage.insert(key, value);
+	}*/
+
+
+	fn store_command(&self, parsed_command: JsonValue) {
+		let key = parsed_command["payload"]["key"].as_str().unwrap().to_string();
+
+		let value_json = parsed_command["payload"]["value"].clone();
+		let value = match value_json {
+			JsonValue::String(s) => node_object::StorageValue::Single(s.to_string()),
+			JsonValue::Array(arr) => node_object::StorageValue::Multiple(arr.into_iter().map(|jv| jv.as_str().unwrap().to_string()).collect()),
+			_ => panic!("Invalid value type"),
+		};
+
+		self.store(key, value);
 	}
-	
+
+	fn store(&self, key: String, new_value: node_object::StorageValue) {
+		let mut this_node = self.node.lock().unwrap();
+		//this_node.storage.insert(key, value);
+
+		match this_node.storage.get_mut(&key) {
+			Some(node_object::StorageValue::Single(_)) => {
+				this_node.storage.insert(key, new_value);
+			},
+			Some(node_object::StorageValue::Multiple(values)) => {
+				match new_value {
+					node_object::StorageValue::Single(value) => {
+						values.push(value.clone());
+
+						//if our key is storing to bids AND condition is_seller
+						if(key.to_string() == "bids" && self.is_seller()){
+							self.publish_bids(key.clone(), value.clone());
+						}
+					},
+					node_object::StorageValue::Multiple(new_values) => {
+						values.extend(new_values);
+					},
+				}
+			},
+			None => {
+				this_node.storage.insert(key, new_value);
+			},
+		}
+
+
+	}
+
+	fn is_seller(&self) -> bool {
+		let this_node = self.node.lock().unwrap();
+		let storage_map = this_node.storage.clone();
+		drop(this_node);
+
+		if let Some(value) = storage_map.get("is_seller") {
+			match value {
+				node_object::StorageValue::Single(s) => return s.to_string() == "true",
+				node_object::StorageValue::Multiple(v) => return v.contains(&"true".to_string()),
+			}
+		}
+		false
+	}
+
+
+	fn publish_bids(&self, key : String, value : String) {
+
+		//when a seller receives bids, it publishes them to its subscribers
+		//uses the STORE method
+
+		//for every seller IP
+		let list_of_ips = self.ret_storage("buyer_ips");
+
+		// Check if the storage value is of type StorageValue::Multiple
+		if let Some(node_object::StorageValue::Multiple(values)) = list_of_ips {
+			for ip_port in values {
+				// Store the value to the client
+				// Key: ID of the seller
+				// Value: New bid info
+				let (ip, port) = self.parse_ip_port(ip_port);
+				node_client::NodeClient::public_store(ip, port, key.clone(), value.clone());
+			}
+		} else {
+			println!("bids unable to be purchased");
+		}
+	}
+
+	fn parse_ip_port(&self, input: String) -> (String, String) {
+		// Split the input string at the ':' character
+		let parts: Vec<&str> = input.split(':').collect();
+
+		// Ensure that the split produced exactly two parts
+		let ip = parts[0].trim().to_string();
+		let port = parts[1].trim().to_string();
+		return (ip, port);
+	}
+
+
+
+	fn ret_storage(&self, key: &str) -> Option<node_object::StorageValue> {
+		let this_node = self.node.lock().unwrap();
+		let storage_map = this_node.storage.clone();
+		drop(this_node);
+
+		return storage_map.get(key).cloned()
+	}
+
+
 	/*fn format_find_cmp_as_str(list : Vec<node_object::RoutingTablePair>) -> String{
 		//Vec<node_object::RoutingTablePair>
 		
@@ -289,7 +405,7 @@ impl  NodeServer  {
 	}
 
 	
-	fn FIND_VALUE(&self, key : String) -> (String, String) {
+	/*fn find_value(&self, key : String) -> (String, String) {
 	
 		let this_node = self.node.lock().unwrap();
 		let storage_map = this_node.storage.clone();
@@ -305,27 +421,22 @@ impl  NodeServer  {
 			return (self.format_find_cmp_as_str(ret_comp), "value".to_string());
 		}
 		
-	}
+	}*/
 
-	
-	
-	fn write_to_file(&self, output : String){
-	
-		let mut data_file = File::create("data.txt").expect("creation failed");
-		data_file.write(output.as_bytes()).expect("write failed");
-	}
-	
-	async fn communicate_with_client(socket: UdpSocket){
-		println!("dsaf");
-		
-	    //receive_msg(socket);
-	    //send_IPs(socket);
-	}
-	
-	
-	async fn send_IPs(socket: UdpSocket){
+	fn find_value(&self, key: String) -> (String, String) {
+		let this_node = self.node.lock().unwrap();
+		let storage_map = this_node.storage.clone();
+		let list = this_node.routing_table.clone();
+		drop(this_node);
 
+		if let Some(storage_value) = storage_map.get(&key) {
+			match storage_value {
+				node_object::StorageValue::Single(s) => (s.to_owned(), "value".to_string()),
+				node_object::StorageValue::Multiple(l) => (l.join(","), "list".to_string()),
+			}
+		} else {
+			let ret_comp = self.FIND_COMP(key.as_bytes().to_vec());
+			(self.format_find_cmp_as_str(ret_comp), "value".to_string())
+		}
 	}
-
-
 }

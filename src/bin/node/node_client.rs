@@ -88,7 +88,7 @@ impl NodeClient {
 				let value = line.trim().to_string();
 				
 				println!("t1, ip: {}, port {}", ip, port);
-				task::block_on(self.STORE(ip, port, key, value));
+				task::block_on(self.old_store(ip, port, key, value));
 
 			} else if line.trim().to_string() == "3" {
 				//FIND_VALUE(key):
@@ -131,7 +131,7 @@ impl NodeClient {
 		Ok(())
 	}
 	
-	async fn FIND_VALUE(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String, key : String) -> json::JsonValue {
+	pub async fn FIND_VALUE(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String, key : String) -> json::JsonValue {
 		let ip_of_sender_clone  = ip_of_sender.clone();
 		let tmp_port_of_sender_clone = tmp_port_of_sender.clone();
 		
@@ -149,7 +149,7 @@ impl NodeClient {
 	
 	}
 	
-	async fn FIND_COMP(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String, id : String) -> json::JsonValue {
+	pub async fn FIND_COMP(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String, id : String) -> json::JsonValue {
 		let ip_of_sender_clone  = ip_of_sender.clone();
 		let tmp_port_of_sender_clone = tmp_port_of_sender.clone();
 
@@ -165,15 +165,46 @@ impl NodeClient {
 
 		return ret_str;
 	}
-	
-	async fn STORE(&self, send_to_ip : String, send_to_port : String, key : String, value : String){
+
+	pub async fn store(&self, send_to_ip: String, send_to_port: String, key: String, value: node_object::StorageValue) {
+		let value_payload = match value {
+			node_object::StorageValue::Single(s) => json::JsonValue::String(s),
+			node_object::StorageValue::Multiple(vec) => json::JsonValue::Array(
+				vec.into_iter().map(json::JsonValue::String).collect(),
+			),
+		};
+
+		let store_payload = json::object!(
+			"key": key,
+			"value": value_payload,
+		);
+
+		let store_cmd = node_commands::craft_command("STORE".to_string(), store_payload);
+
+		task::block_on(node_commands::send_command_to_node(send_to_ip, send_to_port, store_cmd));
+	}
+
+
+	pub async fn old_store(&self, send_to_ip : String, send_to_port : String, key : String, value : String){
 		let store_payload = json::object!(
 			"key" : key,
 			"value" : value,
 		);
-		
+
 		let store_cmd = node_commands::craft_command("STORE".to_string(), store_payload);
-	
+
+		task::block_on(node_commands::send_command_to_node(send_to_ip, send_to_port, store_cmd));
+	}
+
+
+	 pub async fn public_store(send_to_ip : String, send_to_port : String, key : String, value : String){
+		let store_payload = json::object!(
+			"key" : key,
+			"value" : value,
+		);
+
+		let store_cmd = node_commands::craft_command("STORE".to_string(), store_payload);
+
 		task::block_on(node_commands::send_command_to_node(send_to_ip, send_to_port, store_cmd));
 	}
 	
@@ -282,6 +313,30 @@ impl NodeClient {
 			}
 		}
 	}*/
-	
+
+	pub fn parse_ip_port(&self, input: String) -> (String, String) {
+		// Split the input string at the ':' character
+		let parts: Vec<&str> = input.split(':').collect();
+
+		// Ensure that the split produced exactly two parts
+		let ip = parts[0].trim().to_string();
+		let port = parts[1].trim().to_string();
+		return (ip, port);
+	}
+
+
+
+	pub fn ret_storage(&self, key: &str) -> Option<node_object::StorageValue> {
+		let this_node = self.node.lock().unwrap();
+		let storage_map = this_node.storage.clone();
+		drop(this_node);
+
+		return storage_map.get(key).cloned()
+	}
+
+	pub fn print_storage(&self) {
+		let this_node = self.node.lock().unwrap();
+		this_node.print_storage();
+	}
 }
 	

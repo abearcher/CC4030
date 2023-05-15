@@ -5,7 +5,14 @@ use std::collections::HashMap;
 #[derive(Clone)]
 pub struct RoutingTablePair{
 	pub ip: String,
+	pub port: String,
    	pub id: Vec<u8>,
+}
+
+#[derive(Clone)]
+pub enum StorageValue {
+	Single(String),
+	Multiple(Vec<String>),
 }
 
 pub struct Node {
@@ -15,16 +22,17 @@ pub struct Node {
 	//pub ip_list: Mutex<Vec<String>>
 	pub routing_table: Vec<RoutingTablePair>,
 	pub k : i32,
-	pub storage: HashMap<String, String>,
+	pub storage: HashMap<String, StorageValue>,
 	//pub ip_list: Vec<String>,
 }
 
 
 impl RoutingTablePair{
 
-	pub fn new(ip_in : String, id_in : Vec<u8>) -> RoutingTablePair{
+	pub fn new(ip_in : String, port_in : String, id_in : Vec<u8>) -> RoutingTablePair{
 		let mut ret = RoutingTablePair{
 			ip: ip_in,
+			port: port_in,
    			id: id_in,
    		};
    		
@@ -73,8 +81,22 @@ impl Node {
 		return result.to_vec();
 	}
 
+	pub fn print_storage(&self) {
+		println!("printing storage!");
+		for (key, value) in &self.storage {
+			match value {
+				StorageValue::Single(s) => println!("Key: {}, Value: {}", key, s),
+				StorageValue::Multiple(vec) => {
+					let values_str = vec.join(", ");
+					println!("Key: {}, Value: [{}]", key, values_str);
+				}
+			}
+		}
+	}
+
 	/*pub fn add_ip_to_list(&self, ip: String) {
 		let mut ip_list = self.ip_list.lock().unwrap();
 		ip_list.push(ip);
 	}*/
+
 }
