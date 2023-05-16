@@ -13,10 +13,66 @@ pub struct Buyer{
 
 
 //in buyer's hashmap
-//subscribed_to : {"ip":<>, "port": <>, "bids": <>}
+//subscribed_to : Vector of Strings (<ip>:<port>)
 //is_buyer
 
 impl Buyer {
+
+	pub fn new(node_client_in : node_client::NodeClient) -> Buyer{
+
+		return Buyer{
+			node_client: node_client_in,
+		}
+
+	}
+
+	pub async fn command_selection(&self)-> io::Result<()> {
+		let stdin = io::stdin();
+
+
+		let mut line = String::new();
+		loop{
+			//let ip_of_sender = self.node_IP.clone();
+			//let port_of_sender = "4949".to_string();
+			println!("\nPlease select the following commands:\n1 - List All Sellers\n2 - subscribe to seller\n3 - send bid to seller");
+			println!("Selected {}", line);
+			line = String::new();
+			stdin.read_line(&mut line).await?;
+
+			if line.trim().to_string() == "1"{
+				println!("You have chosen to list all sellers");
+				self.ask_for_seller_list();
+				println!("sellers have been listed!");
+			} else if line.trim().to_string() == "2"{
+				//STORE(key, value);
+				println!("You chose to subscribe to seller");
+				println!("Enter IP of seller");
+				line = String::new();
+				stdin.read_line(&mut line).await?;
+				let buyer_ip = line.trim().to_string();
+				println!("Enter port of seller");
+				line = String::new();
+				stdin.read_line(&mut line).await?;
+				let buyer_port = line.trim().to_string();
+				//self.subscribe_to_buyer(buyer_ip, buyer_port)
+
+			} else if line.trim().to_string() == "3" {
+				//FIND_VALUE(key):
+				println!("You have chosen to send a bid to a seller");
+				//list sellers we have subscribed to
+
+				//choose seller
+
+				//send bid to seller
+				//self.send_bid_to_seller(bid_value, buyer_ip, buyer_port);
+			} else {
+				println!("Invalid Selection");
+			}
+		}
+		Ok(())
+	}
+
+
 	fn ask_for_seller_list(&self) {
 	
 		//the basic idea is that we'll use FIND_COMP() to find a list of buyers
@@ -79,7 +135,7 @@ impl Buyer {
 				//let ip = routing_table_pair.ip.clone();
 				//let port = routing_table_pair.port.clone();
 				let sha1_str = node_commands::sha1_to_string(&self.node_client.id);
-				let send = task::block_on(self.node_client.FIND_COMP(ip.clone(), port.clone(), self.node_client.node_IP.clone(), "666".to_string(), sha1_str));
+				let send = task::block_on(self.node_client.FIND_COMP(ip.clone(), port.clone(), self.node_client.node_IP.clone(), "666".to_string(), self.node_client.id.clone()));
 				let new_list = self.extract_ip_port_pairs(&send["comp_list"]);
 				for (ip_new, port_new) in self.check_if_new_ip(&new_list, &list_of_total_IPS).iter(){
 					new_ip_list.push((ip_new.to_string(), port_new.to_string()));

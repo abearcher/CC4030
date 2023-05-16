@@ -123,12 +123,25 @@ impl NodeClient {
 				//let value = line.trim().to_string();
 				
 				println!("t1, ip: {}, port {}", ip, port);
-				task::block_on(self.FIND_COMP(ip, port, ip_of_sender, port_of_sender, hex::encode(&self.id)));
+				task::block_on(self.FIND_COMP(ip, port, ip_of_sender, port_of_sender, self.id.clone()));
 			} else {
 				println!("Invalid Selection");
 			}
 		}
 		Ok(())
+	}
+
+	pub fn first_join(&self, send_to_ip: String, send_to_port : String) -> json::JsonValue {
+
+		println!("Sending first join!");
+		let ip_of_sender = self.node_IP.clone();
+		let id = self.id.clone();
+		let tmp_port_of_sender= "9999".to_string();
+
+		let ret = task::block_on(self.FIND_COMP(send_to_ip, send_to_port, ip_of_sender, tmp_port_of_sender, id));
+
+		return ret;
+
 	}
 	
 	pub async fn FIND_VALUE(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String, key : String) -> json::JsonValue {
@@ -149,7 +162,7 @@ impl NodeClient {
 	
 	}
 	
-	pub async fn FIND_COMP(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String, id : String) -> json::JsonValue {
+	pub async fn FIND_COMP(&self, send_to_ip : String, send_to_port : String, ip_of_sender : String, tmp_port_of_sender: String, id : Vec<u8>) -> json::JsonValue {
 		let ip_of_sender_clone  = ip_of_sender.clone();
 		let tmp_port_of_sender_clone = tmp_port_of_sender.clone();
 
@@ -157,7 +170,7 @@ impl NodeClient {
 			"id": id,
 		);
 
-		let cmd = node_commands::craft_command("PING".to_string(), payload);
+		let cmd = node_commands::craft_command("FIND_COMP".to_string(), payload);
 
 		let ret_str = task::block_on(node_commands::send_and_rcv_command(send_to_ip, send_to_port, cmd, ip_of_sender_clone, tmp_port_of_sender_clone));
 

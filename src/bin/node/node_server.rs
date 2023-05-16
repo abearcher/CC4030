@@ -89,6 +89,7 @@ impl  NodeServer  {
 	}
 	
 	async fn rcv_find_comp(&self, rcv_ip : String, rcv_port : String, routing_table_vector : Vec<RoutingTablePair>){
+		//TODO: return k closest computers based off of ID
 
 		let mut comp_str = Vec::new();
 		for pair in routing_table_vector {
@@ -137,7 +138,7 @@ impl  NodeServer  {
 			
 			println!("We have received {}", received_string);
 			
-			if parsed_command["command"] == "FIND_COMP" {
+			if parsed_command["command"] == "FIND_COMP" || parsed_command["command"] == "FIRST_JOIN" {
 				println!("We have received FIND_COMP command");
 				let id = parsed_command["payload"]["ID"].to_string().as_bytes().to_vec();
 				let ret_find_comp = self.FIND_COMP(id);
@@ -162,11 +163,12 @@ impl  NodeServer  {
 				
 			} else if parsed_command["command"] == "PING"{
 				println!("We have received the PING command");
-				
+
 				task::block_on(self.rcv_ping(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string()));
 
-			} else if parsed_command["command"] == "FIRST_JOIN"{
-				println!("We have received the FIRST_JOIN command");
+			//} else if parsed_command["command"] == "FIRST_JOIN"{
+			//	println!("We have received the FIRST_JOIN command");
+				//task::block_on(self.rcv_first_join(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string()));
 			} else {
 				println!("Command not recognized!");
 			}
@@ -269,13 +271,26 @@ impl  NodeServer  {
 		let key = parsed_command["payload"]["key"].as_str().unwrap().to_string();
 
 		let value_json = parsed_command["payload"]["value"].clone();
-		let value = match value_json {
+
+		println!("The json key: {}, the json value {}", key, value_json);
+		println!("is array {}, is string {}", value_json.is_array(), value_json.is_string());
+
+		/*let value = match value_json {
 			JsonValue::String(s) => node_object::StorageValue::Single(s.to_string()),
 			JsonValue::Array(arr) => node_object::StorageValue::Multiple(arr.into_iter().map(|jv| jv.as_str().unwrap().to_string()).collect()),
 			_ => panic!("Invalid value type"),
-		};
+		};*/
 
-		self.store(key, value);
+		if value_json.is_string() {
+			let value = node_object::StorageValue::Single(value_json.to_string());
+			self.store(key, value);
+		} else if value_json.is_array() {
+			//let value = node_object::StorageValue::Multiple(value_json);
+			//self.store(key, value);
+			println!("Debug here for array!!!!");
+		} else {
+			panic!("Invalid value type")
+		}
 	}
 
 	fn store(&self, key: String, new_value: node_object::StorageValue) {

@@ -36,7 +36,7 @@ impl Seller {
 		loop{
 			//let ip_of_sender = self.node_IP.clone();
 			//let port_of_sender = "4949".to_string();
-			println!("\nPlease select the following commands:\n1-Start auction\n2 - end auction\n3 - print hashmap");
+			println!("\nPlease select the following commands:\n1 - Start auction\n2 - end auction\n3 - print hashmap");
 			println!("Selected {}", line);
 			line = String::new();
 			stdin.read_line(&mut line).await?;
@@ -80,10 +80,10 @@ impl Seller {
 		let is_seller = Single("true".to_string());
 		let is_active_bid = Single("true".to_string());
 
-		self.node_client.store(ip.clone(), port.clone(), "is_seller".to_string(), is_seller);
-		self.node_client.store(ip.clone(), port.clone(), "bids".to_string(), bid_payload);
-		self.node_client.store(ip.clone(), port.clone(), "item_name".to_string(), item_name_payload);
-		self.node_client.store(ip.clone(), port.clone(), "active_bid".to_string(), is_active_bid);
+		task::block_on(self.node_client.store(ip.clone(), port.clone(), "is_seller".to_string(), is_seller));
+		task::block_on(self.node_client.store(ip.clone(), port.clone(), "bids".to_string(), bid_payload));
+		task::block_on(self.node_client.store(ip.clone(), port.clone(), "item_name".to_string(), item_name_payload));
+		task::block_on(self.node_client.store(ip.clone(), port.clone(), "active_bid".to_string(), is_active_bid));
 	}
 
 	fn end_auction(&self){

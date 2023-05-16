@@ -186,6 +186,108 @@ impl NodeRunner {
 }
 
 
+pub struct BuyerRunner {
+	node: Arc<Mutex<node_object::Node>>
+	//pub node: node_object::Node
+}
+
+impl BuyerRunner {
+
+	pub fn new(node_IP : String, node_port: String, k : i32) -> BuyerRunner {
+
+		let node = Arc::new(Mutex::new(node_object::Node::new(node_IP, node_port, k)));
+		BuyerRunner {
+			node: node,
+		}
+
+	}
+
+	pub fn start_first_node(&self) -> std::io::Result<()> {
+		{
+
+			println!("Starting first known node in a network");
+
+			let node_clone = self.node.clone();
+			let server_node = node_clone.clone();
+			let client_node = node_clone.clone();
+
+
+			task::spawn(async move{
+				//here we spawn a listener for incoming requests
+				//this will respond to requests
+				let mut server_obj = node_server::NodeServer::new(server_node);
+				server_obj.run_node_server().await;
+			});
+
+			let client_obj_in = node_client::NodeClient::new(client_node);
+			let client_obj = buyer::Buyer::new(client_obj_in);
+
+			//here we accept user input for different commands
+			task::block_on(client_obj.command_selection());
+
+		} // the socket is closed here
+		Ok(())
+	}
+
+
+	pub fn start_sub_node(&self, known_ip: String, known_port: String)  -> std::io::Result<()> {
+		{
+			println!("Connecting with known node!");
+
+			let node_clone = self.node.clone();
+			let server_node = node_clone.clone();
+			let client_node = node_clone.clone();
+
+			let this_node = self.node.lock().unwrap();
+
+			/*let first_join_payload = json::object!(
+				"ip": this_node.node_IP.clone(),
+				"port": this_node.node_port.clone(),
+				"id" :
+			);
+
+			let this_ip = this_node.node_IP.clone();
+			let this_port = this_node.node_port.clone();
+			drop(this_node);
+
+			let node_clone = self.node.clone();
+
+			let first_join_cmd = node_commands::craft_command("FIRST_JOIN".to_string(), first_join_payload);
+			println!("This is a sub node");
+			let first_routing_table = task::block_on(node_commands::send_and_rcv_command(known_ip, known_port, first_join_cmd, this_ip.clone(), "7777".to_string()));
+			println!("Sent and received");
+
+			 */
+
+
+			//block_on(node_commands::send_command_to_node(known_ip, known_port, first_join_cmd));
+
+			//println!("This is a sub node{}", first_routing_table);
+			//println!("First routing table {}", first_routing_table);
+
+			println!("starting own server");
+
+			task::spawn(async move{
+				//here we spawn a listener for incoming requests
+				//this will respond to requests
+				let mut server_obj = node_server::NodeServer::new(server_node);
+				server_obj.run_node_server().await;
+			});
+
+			let client_obj_in = node_client::NodeClient::new(client_node);
+			client_obj_in.first_join(known_ip.clone(), known_port.clone());
+			let client_obj = buyer::Buyer::new(client_obj_in);
+
+			//here we accept user input for different commands
+			task::block_on(client_obj.command_selection());
+
+			println!("end!")
+		}
+		Ok(())
+	}
+}
+
+
 pub struct SellerRunner {
 	node: Arc<Mutex<node_object::Node>>
 	//pub node: node_object::Node

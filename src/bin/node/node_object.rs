@@ -52,6 +52,9 @@ impl Node {
 		//println!("{:?}", ret_node.ID);
 		//println!("{:?}", String::from_utf8_lossy(&ret_node.ID));
 		//String::from_utf8_lossy(&buf)
+		let mut storage_start = HashMap::new();
+		//inserting a dummie value for testing purposes
+		storage_start.insert(String::from("is_node"), StorageValue::Single(String::from("true")));
 		
 		let ret_node = Node{
 			node_IP: String::from(node_IP),
@@ -60,7 +63,7 @@ impl Node {
 			//ip_list: Mutex::new(Vec::new()),
 			routing_table: Vec::new(),
 			k : k_buckets_in,
-			storage : HashMap::new(),
+			storage : storage_start,
 		};
 		
 		ret_node
