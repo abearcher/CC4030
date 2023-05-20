@@ -7,7 +7,6 @@ use std::sync::{Mutex, Arc};
 use std::any::Any;
 use json::{object, JsonValue};
 use std::option::Option;
-//use bytes::{BigEndian, ByteOrder};
 
 use crate::node::{node_client, node_commands};
 use crate::node::node_object;
@@ -15,30 +14,11 @@ use crate::node::node_object::RoutingTablePair;
 
 pub struct NodeServer  {
 	pub node_IP: String,
-	pub node_port: String, 
-	//pub ID : Vec<u8>,
-	//pub ip_list: Vec<String>,
+	pub node_port: String,
 	pub node : Arc<Mutex<node_object::Node>>
 }
 
 impl  NodeServer  {
-
-	/*pub fn new(node_IP : String, node_port: String) -> NodeServer {
-		let mut ret_node = NodeServer{
-			node_IP: String::from(node_IP),
-			node_port: String::from(node_port),
-			ID : Vec::new(),
-			ip_list: Vec::new(),
-		};
-		
-		let IP = ret_node.node_IP.clone() + ret_node.node_port.as_str();
-		ret_node.ID = ret_node.assign_ID(IP);
-		println!("Assigning test ID to be");
-		println!("{:?}", ret_node.ID);
-		println!("{:?}", String::from_utf8_lossy(&ret_node.ID));
-		//String::from_utf8_lossy(&buf)
-		return ret_node;
-	}*/
 
 	pub fn new(node_in : Arc<Mutex<node_object::Node>>) -> NodeServer {
 		//let node = node_in.lock().unwrap();
@@ -56,8 +36,6 @@ impl  NodeServer  {
 		}	
 	}
 
-
-	/* ----- FUNCTIONS FOR SERVER ------- */
 	async fn rcv_ping(&self, rcv_ip : String, rcv_port : String){
 		println!("Sending ping response back!");
 		let ping_rcv_payload = json::object!(
@@ -138,7 +116,7 @@ impl  NodeServer  {
 			
 			println!("We have received {}", received_string);
 			
-			if parsed_command["command"] == "FIND_COMP" || parsed_command["command"] == "FIRST_JOIN" {
+			if parsed_command["command"] == "FIND_COMP" {
 				println!("We have received FIND_COMP command");
 				let id = parsed_command["payload"]["ID"].to_string().as_bytes().to_vec();
 				let ret_find_comp = self.FIND_COMP(id);
@@ -150,32 +128,16 @@ impl  NodeServer  {
 				task::block_on(self.rcv_find_value(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string(), ret_val, value_or_list));
 			} else if parsed_command["command"] == "STORE" {
 				println!("We have received STORE command");
-				//let key = parsed_command["payload"]["key"].to_string();
-				//let value = parsed_command["payload"]["value"].clone();
+
 				self.store_command(parsed_command.clone());
-				
-				/*let this_node = self.node.lock().unwrap();
-    				//this_node.storage.insert(key, value);
-				for (key, value) in &this_node.storage {
-					println!("{}: {}", key, value);
-				}
-				drop(this_node);*/
-				
+
 			} else if parsed_command["command"] == "PING"{
 				println!("We have received the PING command");
 
 				task::block_on(self.rcv_ping(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string()));
-
-			//} else if parsed_command["command"] == "FIRST_JOIN"{
-			//	println!("We have received the FIRST_JOIN command");
-				//task::block_on(self.rcv_first_join(parsed_command["payload"]["IP"].to_string(), parsed_command["payload"]["PORT"].to_string()));
 			} else {
 				println!("Command not recognized!");
 			}
-			
-			//self.write_to_file(received_string.to_string());
-				
-				//println!("stuff inside code");
 		}
 	}
 	
@@ -280,22 +242,34 @@ impl  NodeServer  {
 		println!("The json key: {}, the json value {}", key, value_json);
 		println!("is array {}, is string {}", value_json.is_array(), value_json.is_string());
 
-		/*let value = match value_json {
-			JsonValue::String(s) => node_object::StorageValue::Single(s.to_string()),
-			JsonValue::Array(arr) => node_object::StorageValue::Multiple(arr.into_iter().map(|jv| jv.as_str().unwrap().to_string()).collect()),
-			_ => panic!("Invalid value type"),
-		};*/
+		if key.clone() == "active_auction" && value_json.clone() == "false" {
+			self.end_auction();
+		}
 
-		if value_json.is_string() {
+		if value_json.is_string() && key.clone() != "bid" {
 			let value = node_object::StorageValue::Single(value_json.to_string());
 			self.store(key, value);
 		} else if value_json.is_array() {
-			//let value = node_object::StorageValue::Multiple(value_json);
-			//self.store(key, value);
-			println!("Debug here for array!!!!");
+			let value = node_object::StorageValue::Multiple(self.json_list_to_str_vec(value_json));
+			self.store(key, value);
 		} else {
 			panic!("Invalid value type")
 		}
+
+
+	}
+
+	fn json_list_to_str_vec(&self, jval : JsonValue) -> Vec<String> {
+		let mut ret_vec = Vec::new();
+		for i in 0 .. jval.len(){
+			ret_vec.push(jval[i].clone().to_string());
+		}
+		return ret_vec;
+	}
+
+	fn end_auction(&self){
+		println!("THE AUCTION IS OVER!!!!!");
+
 	}
 
 	fn store(&self, key: String, new_value: node_object::StorageValue) {

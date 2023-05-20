@@ -15,6 +15,7 @@ mod node_object;
 mod seller;
 mod buyer;
 mod node_server_seller;
+mod auction_timer;
 
 //mod cm;
 use node_server::NodeServer; // Use the NodeCommand struct
@@ -238,33 +239,6 @@ impl BuyerRunner {
 			let server_node = node_clone.clone();
 			let client_node = node_clone.clone();
 
-			let this_node = self.node.lock().unwrap();
-			drop(this_node);
-			/*let first_join_payload = json::object!(
-				"ip": this_node.node_IP.clone(),
-				"port": this_node.node_port.clone(),
-				"id" :
-			);
-
-			let this_ip = this_node.node_IP.clone();
-			let this_port = this_node.node_port.clone();
-			drop(this_node);
-
-			let node_clone = self.node.clone();
-
-			let first_join_cmd = node_commands::craft_command("FIRST_JOIN".to_string(), first_join_payload);
-			println!("This is a sub node");
-			let first_routing_table = task::block_on(node_commands::send_and_rcv_command(known_ip, known_port, first_join_cmd, this_ip.clone(), "7777".to_string()));
-			println!("Sent and received");
-
-			 */
-
-
-			//block_on(node_commands::send_command_to_node(known_ip, known_port, first_join_cmd));
-
-			//println!("This is a sub node{}", first_routing_table);
-			//println!("First routing table {}", first_routing_table);
-
 			println!("starting own server");
 
 			task::spawn(async move{
@@ -290,7 +264,9 @@ impl BuyerRunner {
 
 
 pub struct SellerRunner {
-	node: Arc<Mutex<node_object::Node>>
+	node: Arc<Mutex<node_object::Node>>,
+	ip : String,
+	port : String,
 	//pub node: node_object::Node
 }
 
@@ -298,9 +274,11 @@ impl SellerRunner {
 
 	pub fn new(node_IP : String, node_port: String, k : i32) -> SellerRunner {
 
-		let node = Arc::new(Mutex::new(node_object::Node::new(node_IP, node_port, k)));
+		let node = Arc::new(Mutex::new(node_object::Node::new(node_IP.clone(), node_port.clone(), k)));
 		SellerRunner {
 			node: node,
+			ip:  node_IP.clone(),
+			port: node_port.clone(),
 		}
 
 	}
@@ -325,11 +303,25 @@ impl SellerRunner {
 			let client_obj_in = node_client::NodeClient::new(client_node);
 			let client_obj = seller::Seller::new(client_obj_in);
 
+			self.spawn_auction_timer();
+
 			//here we accept user input for different commands
 			task::block_on(client_obj.command_selection());
 
 		} // the socket is closed here
 		Ok(())
+	}
+
+	fn spawn_auction_timer(&self){
+		let this_ip = self.ip.clone();
+		let this_port = self.port.clone();
+
+		task::spawn(async move{
+			//here we spawn a listener for incoming requests
+			//this will respond to requests
+			let mut auction = auction_timer::AuctionTimer::new( this_ip, this_port);
+			auction.auction_timer(300).await;
+		});
 	}
 
 
@@ -357,7 +349,6 @@ impl SellerRunner {
 			block_on(node_commands::send_command_to_node(known_ip, known_port, first_join_cmd));
 			println!("starting own server");
 
-
 			task::spawn(async move{
 				//here we spawn a listener for incoming requests
 				//this will respond to requests
@@ -367,6 +358,8 @@ impl SellerRunner {
 
 			let client_obj_in = node_client::NodeClient::new(client_node);
 			let client_obj = seller::Seller::new(client_obj_in);
+
+			self.spawn_auction_timer();
 
 			//here we accept user input for different commands
 			task::block_on(client_obj.command_selection());

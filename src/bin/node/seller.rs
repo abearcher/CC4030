@@ -4,6 +4,7 @@ use crate::node::node_object;
 use async_std::{fs::File, io, prelude::*, task};
 use async_std::net::UdpSocket;
 use crate::node::node_object::StorageValue::Single;
+use crate::node::node_object::StorageValue::Multiple;
 
 pub struct Seller{
 	node_client: node_client::NodeClient
@@ -75,15 +76,22 @@ impl Seller {
 		let ip = self.node_client.node_IP.clone();
 		let port = self.node_client.node_port.clone();
 
-		let bid_payload = Single(starting_bid_price);
+
+		let mut bid_payload = Vec::new();
+		bid_payload.push(starting_bid_price);
+		//let mut wallet_payload = Vec::new();
+
 		let item_name_payload = Single(item_name);
 		let is_seller = Single("true".to_string());
 		let is_active_bid = Single("true".to_string());
+		let uid = Single("37cd8655-d481-47cf-ba9e-2ae8477839ac".to_string());
 
 		task::block_on(self.node_client.store(ip.clone(), port.clone(), "is_seller".to_string(), is_seller));
-		task::block_on(self.node_client.store(ip.clone(), port.clone(), "bids".to_string(), bid_payload));
+		task::block_on(self.node_client.store(ip.clone(), port.clone(), "bids".to_string(), Multiple(bid_payload)));
+		//task::block_on(self.node_client.store(ip.clone(), port.clone(), "wallet_id".to_string(), bid_payload));
 		task::block_on(self.node_client.store(ip.clone(), port.clone(), "item_name".to_string(), item_name_payload));
-		task::block_on(self.node_client.store(ip.clone(), port.clone(), "active_bid".to_string(), is_active_bid));
+		task::block_on(self.node_client.store(ip.clone(), port.clone(), "active_auction".to_string(), is_active_bid));
+		task::block_on(self.node_client.store(ip.clone(), port.clone(), "uid".to_string(), uid));
 	}
 
 	fn end_auction(&self){

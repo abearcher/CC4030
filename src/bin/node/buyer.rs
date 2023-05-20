@@ -59,12 +59,16 @@ impl Buyer {
 			} else if line.trim().to_string() == "3" {
 				//FIND_VALUE(key):
 				println!("You have chosen to send a bid to a seller");
+				println!("Bid value");
+				line = String::new();
+				stdin.read_line(&mut line).await?;
+				let bid_value : i32 = line.trim().parse().unwrap();
 				//list sellers we have subscribed to
 
 				//choose seller
 
 				//send bid to seller
-				//self.send_bid_to_seller(bid_value, buyer_ip, buyer_port);
+				self.send_bid_to_seller(bid_value, "123".to_string(),"127.0.0.1".to_string(), "34000".to_string());
 			} else {
 				println!("Invalid Selection");
 			}
@@ -212,14 +216,18 @@ impl Buyer {
 	
 	}
 	
-	fn send_bid_to_seller(&self, bid_value : i32, send_to_ip : String, send_to_port : String){
+	fn send_bid_to_seller(&self, bid_value : i32, wallet_id: String, send_to_ip : String, send_to_port : String){
 	
 		let key = "bids".to_string();
+		let wallet_key = "wallet_id".to_string();
 		let mut ret_bid = Vec::new();
 		ret_bid.push(bid_value.to_string());
-		self.node_client.store(send_to_ip, send_to_port, key, StorageValue::Multiple(ret_bid));
+
+		let mut wallet_id_list = Vec::new();
+		wallet_id_list.push(wallet_id);
+
+		task::block_on(self.node_client.store(send_to_ip.clone(), send_to_port.clone(), key, StorageValue::Multiple(ret_bid)));
+		task::block_on(self.node_client.store(send_to_ip.clone(), send_to_port.clone(), wallet_key, StorageValue::Multiple(wallet_id_list)));
 	
 	}
-
-
 }
