@@ -180,6 +180,9 @@ impl  NodeServer  {
 	}
 	
 	fn FIND_COMP(&self, id : Vec<u8>) -> Vec<node_object::RoutingTablePair> {
+
+		//TODO: add check that if the IP is new, and closest in the k bucket closes nodes, we add that to the routing table
+		//and remove the k least closes if needed
 	
 		let mut min = node_object::RoutingTablePair::new("".to_string(), "".to_string(),Vec::new());
 		let mut min_index = 0;
@@ -193,7 +196,9 @@ impl  NodeServer  {
 		let mut list = this_node.routing_table.clone();
 		drop(this_node);
 		
-		for i in 0..k-1{
+		for i in 0..list.len(){
+			//println!("iteration: {}", i);
+			//println!("list len: {}", list.len());
 			(min, min_index) = self.find_min_dist(id.clone(), list.clone());
 			list_of_closest_comps.push(min);
 			list.remove(min_index.try_into().unwrap());

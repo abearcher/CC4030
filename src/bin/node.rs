@@ -239,7 +239,7 @@ impl BuyerRunner {
 			let client_node = node_clone.clone();
 
 			let this_node = self.node.lock().unwrap();
-
+			drop(this_node);
 			/*let first_join_payload = json::object!(
 				"ip": this_node.node_IP.clone(),
 				"port": this_node.node_port.clone(),
@@ -275,6 +275,7 @@ impl BuyerRunner {
 			});
 
 			let client_obj_in = node_client::NodeClient::new(client_node);
+			println!("sending first joine");
 			client_obj_in.first_join(known_ip.clone(), known_port.clone());
 			let client_obj = buyer::Buyer::new(client_obj_in);
 

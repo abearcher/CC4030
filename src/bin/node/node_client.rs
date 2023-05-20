@@ -168,6 +168,8 @@ impl NodeClient {
 
 		let payload = json::object!(
 			"id": id,
+			"IP": ip_of_sender.clone(),
+			"PORT": tmp_port_of_sender.clone(),
 		);
 
 		let cmd = node_commands::craft_command("FIND_COMP".to_string(), payload);

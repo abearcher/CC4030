@@ -97,6 +97,16 @@ impl Node {
 		}
 	}
 
+	pub fn add_to_routing_table(&mut self, new_routing_cell: RoutingTablePair){
+		//TODO: add check that if the IP is new, and closest in the k bucket closes nodes, we add that to the routing table
+		//and remove the k least closes if needed
+
+		if self.routing_table.len() < self.k as usize {
+			self.routing_table.push(new_routing_cell);
+		} else {}
+
+	}
+
 	/*pub fn add_ip_to_list(&self, ip: String) {
 		let mut ip_list = self.ip_list.lock().unwrap();
 		ip_list.push(ip);
