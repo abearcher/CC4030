@@ -103,7 +103,10 @@ impl Node {
 
 		if self.routing_table.len() < self.k as usize {
 			self.routing_table.push(new_routing_cell);
-		} else {}
+		} else {
+
+
+		}
 
 	}
 
