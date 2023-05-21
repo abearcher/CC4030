@@ -14,7 +14,6 @@ mod node_client;
 mod node_object;
 mod seller;
 mod buyer;
-mod node_server_seller;
 mod auction_timer;
 
 //mod cm;
