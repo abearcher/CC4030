@@ -19,14 +19,7 @@ pub fn craft_command(command_in : String, payload: JsonValue) -> JsonValue {
 
 
 pub async fn send_command_to_node(send_to_ip: String, send_to_port: String, crafted_cmd: JsonValue) -> std::io::Result<()> {
-	
-	//const THE_MERCHANT_OF_VENICE: &[u8] = b"
-	//    If you prick us, do we not bleed?
-	//    If you tickle us, do we not laugh?
-	//    If you poison us, do we not die?
-	//    And if you wrong us, shall we not revenge?
-	//";
-	
+
 	let addr = format!("{}:{}", send_to_ip, send_to_port);
 	
 	println!("----------------------");

@@ -1,10 +1,11 @@
 use super::block::Block;
 use chrono::prelude::*;
+use serde::{Serialize, Deserialize};
 
 type Blocks = Vec<Block>;
 
 // `Blockchain` A struct that represents the blockchain.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Blockchain {
     // The first block to be added to the chain.
     pub genesis_block: Block,

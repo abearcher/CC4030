@@ -253,6 +253,8 @@ impl BuyerRunner {
 			client_obj_in.first_join(known_ip.clone(), known_port.clone());
 			let client_obj = buyer::Buyer::new(client_obj_in);
 
+			//clinet_obj.start_blockchain();
+
 			//here we accept user input for different commands
 			task::block_on(client_obj.command_selection());
 
@@ -301,6 +303,7 @@ impl SellerRunner {
 			});
 
 			let client_obj_in = node_client::NodeClient::new(client_node);
+			client_obj_in.start_blockchain();
 			let client_obj = seller::Seller::new(client_obj_in);
 
 			self.spawn_auction_timer();
@@ -320,7 +323,7 @@ impl SellerRunner {
 			//here we spawn a listener for incoming requests
 			//this will respond to requests
 			let mut auction = auction_timer::AuctionTimer::new( this_ip, this_port);
-			auction.auction_timer(300).await;
+			auction.auction_timer(20).await;
 		});
 	}
 

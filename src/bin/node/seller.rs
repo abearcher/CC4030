@@ -32,34 +32,33 @@ impl Seller {
 	pub async fn command_selection(&self)-> io::Result<()> {
 		let stdin = io::stdin();
 
-
 		let mut line = String::new();
+		println!("Please start the auction");
+		println!("Please enter starting bid price");
+		line = String::new();
+		stdin.read_line(&mut line).await?;
+		let starting_price = line.trim().to_string();
+		println!("Please enter starting item name");
+		line = String::new();
+		stdin.read_line(&mut line).await?;
+		let item_name = line.trim().to_string();
+		self.start_auction(starting_price.clone(), item_name.clone());
+
+
 		loop{
 			//let ip_of_sender = self.node_IP.clone();
 			//let port_of_sender = "4949".to_string();
-			println!("\nPlease select the following commands:\n1 - Start auction\n2 - end auction\n3 - print hashmap");
+			println!("\nPlease select the following commands:\n1 - end auction\n2 - print hashmap");
 			println!("Selected {}", line);
 			line = String::new();
 			stdin.read_line(&mut line).await?;
 
-			if line.trim().to_string() == "1"{
-				println!("You have chosen to start the auction");
-				println!("Please enter starting bid price");
-				line = String::new();
-				stdin.read_line(&mut line).await?;
-				let starting_price = line.trim().to_string();
-				println!("Please enter starting item name");
-				line = String::new();
-				stdin.read_line(&mut line).await?;
-				let item_name = line.trim().to_string();
-				self.start_auction(starting_price.clone(), item_name.clone());
-
-			} else if line.trim().to_string() == "2"{
+		if line.trim().to_string() == "1"{
 				//STORE(key, value);
 				println!("You have chosen to end the auction.");
 				self.end_auction();
 
-			} else if line.trim().to_string() == "3" {
+			} else if line.trim().to_string() == "2" {
 				//FIND_VALUE(key):
 				println!("You have chosen to print storage. ");
 				self.node_client.print_storage();

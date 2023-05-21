@@ -7,6 +7,10 @@ use std::sync::{Mutex, Arc};
 use std::any::Any;
 use json::{object, JsonValue};
 use std::option::Option;
+use serde_json;
+use crate::node;
+
+use crate::node::buyer::models;
 
 use crate::node::{node_client, node_commands};
 use crate::node::node_object;
@@ -92,10 +96,7 @@ impl  NodeServer  {
 	
 	}
 
-
 	pub async fn run_node_server(&self) -> std::io::Result<()> {
-	
-		//let bind_to = self.node_IP.clone() + ":" + self.node_port.as_str();
 		
 		let bind_to = format!("{}:{}", self.node_IP, self.node_port);
 		//let socket = UdpSocket::bind("127.0.0.1:34254").await?;
@@ -103,7 +104,7 @@ impl  NodeServer  {
 		let socket = UdpSocket::bind(bind_to).await?;
 
 		
-		let mut buf = vec![0u8; 1024];
+		let mut buf = vec![0u8; 5000];
 		
 		loop {
 			let (n, peer) = socket.recv_from(&mut buf).await?;
@@ -267,9 +268,68 @@ impl  NodeServer  {
 		return ret_vec;
 	}
 
+
+
 	fn end_auction(&self){
 		println!("THE AUCTION IS OVER!!!!!");
+		//grab largest bid
+		let largest_json_bid = self.grab_largest_bid();
+		//save largest bid
 
+		//grab value from hashmap
+		let blockchain_get= self.ret_storage("blockchain");
+
+		if let Some(node_object::StorageValue::Single(block_val)) = blockchain_get {
+			//deserialize the blockchain
+			let mut blockchain = serde_json::from_str(&*block_val).expect("Deserialization failed");
+
+			//add new block
+			models::blockchain::Blockchain::add_block(&mut blockchain, largest_json_bid);
+
+			//re-serialize
+			let re_json = serde_json::to_string(&blockchain).expect("Serialization failed");
+
+			//replace old blockchain with new
+			let send_info = node_object::StorageValue::Single(re_json.clone());
+
+			println!("the final info for the auction is: {}", re_json.clone());
+
+			task::block_on(node::node_client::NodeClient::public_store(self.node_IP.clone(), self.node_port.clone(), "blockchain".to_string(), send_info));
+
+			//let mut this_node = self.node.lock().unwrap();
+			//this_node.storage["blockchain"] = re_json;
+
+		}
+
+
+	}
+
+	fn grab_largest_bid(&self) -> (String) {
+		let bids_get= self.ret_storage("bids");
+		let mut ret_json = "".to_string();
+
+		if let Some(node_object::StorageValue::Multiple(bids)) = bids_get {
+			let mut ret_bid : i32 = bids[0].parse().unwrap();
+			let mut ret_index : i32 = 0;
+			for i in 1..bids.len() {
+				//println!("{}", cur_bid);
+				let json_bid = json::parse(&*bids[i].clone()).unwrap();
+				let cur_bid: i32 = json::stringify(json_bid["bid"].clone()).parse().unwrap();
+
+				if cur_bid > ret_bid {
+					ret_bid = cur_bid;
+					ret_index = i as i32;
+					ret_json = json::stringify(json_bid.clone());
+				}
+
+				//println!("{}", json["bid"]);
+			}
+			println!("largest bid for auction: {}", ret_bid);
+			println!("json return value: {}", ret_json);
+			return ret_json;
+		}
+
+		return ret_json;
 	}
 
 	fn store(&self, key: String, new_value: node_object::StorageValue) {
@@ -333,7 +393,7 @@ impl  NodeServer  {
 				// Key: ID of the seller
 				// Value: New bid info
 				let (ip, port) = self.parse_ip_port(ip_port);
-				node_client::NodeClient::public_store(ip, port, key.clone(), value.clone());
+				node_client::NodeClient::public_store(ip, port, key.clone(), node::node_object::StorageValue::Single(value.clone()));
 			}
 		} else {
 			println!("bids unable to be purchased");

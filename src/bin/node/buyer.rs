@@ -3,8 +3,11 @@ use crate::node::node_client;
 use crate::node::node_commands;
 use crate::node::node_object::StorageValue;
 use async_std::{fs::File, io, prelude::*, task};
-use json::JsonValue;
+use json::{JsonValue, object, stringify};
+use rsa::pss::VerifyingKey;
+use sha2::Sha256;
 
+pub mod models;
 
 pub struct Buyer{
 	node_client: node_client::NodeClient,
@@ -28,13 +31,14 @@ impl Buyer {
 
 	pub async fn command_selection(&self)-> io::Result<()> {
 		let stdin = io::stdin();
+		let mut wallet : models::wallet::Wallet = models::wallet::Wallet::new("test.email".to_string());
 
 
 		let mut line = String::new();
 		loop{
 			//let ip_of_sender = self.node_IP.clone();
 			//let port_of_sender = "4949".to_string();
-			println!("\nPlease select the following commands:\n1 - List All Sellers\n2 - subscribe to seller\n3 - send bid to seller");
+			println!("\nPlease select the following commands:\n1 - List All Sellers\n2 - subscribe to seller\n3 - send bid to seller\n4 - create wallet");
 			println!("Selected {}", line);
 			line = String::new();
 			stdin.read_line(&mut line).await?;
@@ -62,13 +66,22 @@ impl Buyer {
 				println!("Bid value");
 				line = String::new();
 				stdin.read_line(&mut line).await?;
-				let bid_value : i32 = line.trim().parse().unwrap();
+				let bid_value: i32 = line.trim().parse().unwrap();
+				let signed_data = models::wallet::Wallet::sign_data(bid_value.to_string(),wallet.keypair.clone().1);
 				//list sellers we have subscribed to
 
 				//choose seller
 
 				//send bid to seller
-				self.send_bid_to_seller(bid_value, "123".to_string(),"127.0.0.1".to_string(), "34000".to_string());
+				self.send_bid_to_seller(bid_value, "123".to_string(), signed_data, "127.0.0.1".to_string(), "34000".to_string());
+			} else if line.trim().to_string() == "4" {
+				println!("Insert the owner email please:");
+				line = String::new();
+				stdin.read_line(&mut line).await?;
+				let email = line.trim().to_string();
+				// create the wallet
+				wallet = models::wallet::Wallet::new(email.to_string());
+
 			} else {
 				println!("Invalid Selection");
 			}
@@ -216,18 +229,26 @@ impl Buyer {
 	
 	}
 	
-	fn send_bid_to_seller(&self, bid_value : i32, wallet_id: String, send_to_ip : String, send_to_port : String){
-	
+	fn send_bid_to_seller(&self, bid_value : i32, wallet_id: String,signed_data : String, send_to_ip : String, send_to_port : String){
+
 		let key = "bids".to_string();
-		let wallet_key = "wallet_id".to_string();
-		let mut ret_bid = Vec::new();
-		ret_bid.push(bid_value.to_string());
+		//bid + wallet_id + signature + verifying key
 
-		let mut wallet_id_list = Vec::new();
-		wallet_id_list.push(wallet_id);
+		//let mut wallet_id_list = Vec::new();
+		//wallet_id_list.push(wallet_id);
+		let formatted_json= object!{
+			"bid": bid_value,
+			"wallet_id": wallet_id,
+			"signature" : signed_data,
+		};
 
-		task::block_on(self.node_client.store(send_to_ip.clone(), send_to_port.clone(), key, StorageValue::Multiple(ret_bid)));
-		task::block_on(self.node_client.store(send_to_ip.clone(), send_to_port.clone(), wallet_key, StorageValue::Multiple(wallet_id_list)));
+		let dump_json  = formatted_json.dump();
+
+		let mut ret_json = Vec::new();
+		ret_json.push(dump_json);
+
+		task::block_on(self.node_client.store(send_to_ip.clone(), send_to_port.clone(), key, StorageValue::Multiple(ret_json)));
+
 	
 	}
 }

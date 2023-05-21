@@ -2,9 +2,14 @@ use async_std::{fs::File, io, prelude::*, task};
 use async_std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
 use hex;
+use crate::node;
+use crate::node::buyer::models;
 
 use crate::node::node_commands;
 use crate::node::node_object;
+
+use std::thread;
+use std::time::Duration;
 
 
 pub struct NodeClient {
@@ -15,17 +20,7 @@ pub struct NodeClient {
 }
 
 impl NodeClient {
-	
-	/*pub fn new(node_IP : String, node_port: String) -> NodeClient {
-		let mut ret_node = NodeClient{
-			node_IP: String::from(node_IP),
-			node_port: String::from(node_port),
-		};
 
-		return ret_node;
-	}*/
-	
-	
 	pub fn new(node_in : Arc<Mutex<node_object::Node>>) -> NodeClient{
 		let this_node = node_in.lock().unwrap();
 
@@ -212,10 +207,17 @@ impl NodeClient {
 	}
 
 
-	 pub async fn public_store(send_to_ip : String, send_to_port : String, key : String, value : String){
+	pub async fn public_store(send_to_ip: String, send_to_port: String, key: String, value: node_object::StorageValue) {
+		let value_payload = match value {
+			node_object::StorageValue::Single(s) => json::JsonValue::String(s),
+			node_object::StorageValue::Multiple(vec) => json::JsonValue::Array(
+				vec.into_iter().map(json::JsonValue::String).collect(),
+			),
+		};
+
 		let store_payload = json::object!(
-			"key" : key,
-			"value" : value,
+			"key": key,
+			"value": value_payload,
 		);
 
 		let store_cmd = node_commands::craft_command("STORE".to_string(), store_payload);
@@ -242,43 +244,6 @@ impl NodeClient {
 		
 		return ret_str;
 	}
-	
-	/*async fn full_ping_cmd(&self, receiver_ip : String, receiver_port : String){
-		println!("t3");
-	
-		println!("sending to {}:{}", receiver_ip, receiver_port);
-		
-		let sender_ip = self.node_IP.clone();
-		let sender_port = "4444".to_string();
-		
-		let sender_ip_clone = sender_ip.clone();
-		let sender_port_clone = sender_port.clone();
-		
-    		let ready_flag = Arc::new(Mutex::new(false));
-    		let ready_flag_clone = Arc::clone(&ready_flag);
-	
-		let handle = task::spawn(
-			async move{
-					//here we spawn a listener for incoming requests
-					//this will respond to requests
-					NodeClient::tmp_srv(sender_ip, sender_port, ready_flag_clone).await;
-		});
-			
-		while !*ready_flag.lock().unwrap() {
-			task::yield_now().await;
-		}
-			
-		task::block_on(self.send_ping_cmd(sender_ip_clone, sender_port_clone, receiver_ip, receiver_port));
-		
-		
-		//handle.join().await.expect("Failed to join handle");
-		handle.await;
-		println!("after await")
-		
-   		//task::block_on(handle);
-	
-	}*/
-
 
 	async fn send_ping_cmd(&self, node_IP : String, node_port : String, receiver_ip : String, receiver_port : String){
 		//craft the ID as payload
@@ -293,41 +258,7 @@ impl NodeClient {
 		task::block_on(node_commands::send_command_to_node(receiver_ip, receiver_port, ping_command));
 		println!("sent!")
 	}
-	
-	/*pub async fn tmp_srv(node_IP : String, node_port : String,  ready_flag: Arc<Mutex<bool>>) -> std::io::Result<()> {
-	
-		let bind_to = format!("{}:{}", node_IP, node_port);
-		//let socket = UdpSocket::bind("127.0.0.1:34254").await?;
-		println!("Starting tmp server at {}", bind_to.to_string());
-		let socket = UdpSocket::bind(bind_to).await?;
-		println!("Starting server");
-		
-		let mut buf = vec![0u8; 1024];
-		
-		//let _ = ready_tx.send(());
-		*ready_flag.lock().unwrap() = true;
-		
-		println!("yoyoyoyo");
-		
-		loop {
-			let (n, peer) = socket.recv_from(&mut buf).await?;
-			socket.send_to(&buf[..n], &peer).await?;
-			println!("Received {} bytes from {}", n, peer);
-			println!("Received message was {:?}", String::from_utf8_lossy(&buf));
-			
-			let received_string = &String::from_utf8_lossy(&buf[..n]);
-			let parsed_command = json::parse(received_string).unwrap();
-			
-			println!("We have received {}", received_string);
-			println!("received cmd is {}", parsed_command["command"].to_string());
-			
-			if parsed_command["command"].to_string() == "PING_RECV".to_string() {
-				println!("We have received PING_RECV command");
-			} else {
-				println!("Command not recognized!");
-			}
-		}
-	}*/
+
 
 	pub fn parse_ip_port(&self, input: String) -> (String, String) {
 		// Split the input string at the ':' character
@@ -352,6 +283,20 @@ impl NodeClient {
 	pub fn print_storage(&self) {
 		let this_node = self.node.lock().unwrap();
 		this_node.print_storage();
+	}
+
+	pub fn start_blockchain(&self){
+		thread::sleep(Duration::from_secs(3));
+		println!("Starting blockchain!");
+		let difficulty = 1;
+		let mut blockchain = models::blockchain::Blockchain::new(difficulty);
+		let json = serde_json::to_string(&blockchain).expect("Serialization failed");
+		//let mut send_vec = Vec::new();
+		//send_vec.push(json);
+		let send_info = node_object::StorageValue::Single(json);
+
+		task::block_on(node::node_client::NodeClient::public_store(self.node_IP.clone(), self.node_port.clone(), "blockchain".to_string(), send_info));
+
 	}
 }
 	

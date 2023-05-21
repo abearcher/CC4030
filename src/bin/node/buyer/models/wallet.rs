@@ -5,11 +5,13 @@ use uuid::Uuid;
 use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
 use rsa::sha2::{Digest, Sha256};
+use std::marker::PhantomData;
 
 
 // Wallet created per email provided
 #[derive(Debug)]
-pub struct Wallet {
+pub struct Wallet
+{
     // wallet local id
     pub index: Uuid,
     // wallet email owner
@@ -18,9 +20,11 @@ pub struct Wallet {
     pub keypair: (RsaPublicKey, RsaPrivateKey),
     // total balance from wallet
     pub balance: f64,
+
 }
 
-impl Wallet {
+impl Wallet
+{
     // Create a new wallet
     pub fn new (email: String) -> Self {
         // Current wallet to be created.
@@ -28,7 +32,7 @@ impl Wallet {
             index: Uuid::new_v4(),
             email,
             keypair: Self::generate_keypair(),
-            balance: 1000.0
+            balance: 1000.0,
         };
 
         wallet
@@ -52,7 +56,7 @@ impl Wallet {
         println!("Public Key:\n{:#?}", public_key_pem);
     }
     //-> SigningKey, VerifyingKey
-    pub fn sign_data(data: String, priv_key: RsaPrivateKey){
+    pub fn sign_data(data: String, priv_key: RsaPrivateKey) -> String{
         //derive the signing and verifying keys
         let signing_key = SigningKey::<Sha256>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
@@ -65,5 +69,6 @@ impl Wallet {
 
         //test verify
         verifying_key.verify(data_to_sign, &signature).expect("failed to verify");
+        return signature.to_string();
     }
 }
